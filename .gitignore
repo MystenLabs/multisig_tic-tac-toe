@@ -32,3 +32,6 @@ move/poc/build
 # env files under the setup directory
 setup/*.env
 .publish.res.json
+
+# rust
+client/target
