@@ -7,4 +7,11 @@ authors = ["flofriday <flohacksfriday@gmail.com>", "nikos <nikos.terzo@mystenlab
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-termcolor = "1.2.0"
+termcolor = "1.1" # Had to use v1.1
+sui-sdk = { git = "https://github.com/MystenLabs/sui", branch = "devnet" }
+shared-crypto = { git = "https://github.com/MystenLabs/sui", branch = "devnet" } 
+sui-keys = { git = "https://github.com/MystenLabs/sui", branch = "devnet" } 
+sui-types = { git = "https://github.com/MystenLabs/sui", branch = "devnet" } 
+tokio = "1.32.0"
+anyhow = "1.0.75"
+dirs = "5.0.1"
