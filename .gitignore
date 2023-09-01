@@ -32,6 +32,7 @@ move/poc/build
 # env files under the setup directory
 setup/*.env
 .publish.res.json
+.faucet.res.json
 
 # rust
-client/target
+tic-tac-toe_client/target
