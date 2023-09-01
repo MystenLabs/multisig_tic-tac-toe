@@ -1,22 +1,21 @@
-# POC TEMPLATE
+# ⚠️ WORK IN PROGRESS ⚠️
 
-This repo is a template POC, that will be used for initializing future POCs easier.
+# Multisig Tic Tac Toe
+
+See also https://github.com/MystenLabs/sui/blob/main/crates/sui-sdk/examples/tic_tac_toe.rs and
+https://github.com/MystenLabs/sui/blob/main/sui_programmability/examples/games/sources/shared_tic_tac_toe.move
+
+Instead of sharing the game-board, it belongs to the multi-sig account of the two players
 
 ### Directories structure
 
-- move:
-    - Contains the Move code of the smart contracts
-    - Contains a sample package named `poc` where the developer can add a move module and start building
+- contract:
+    - Contains the Move code of the smart contract
 
-- app
-    - Contains a Typescript React App, boostrapped with Vite, with ready-to-use:
-        - three different user roles
-        - routing based on the permissions of the current user
-        - Sui typescript SDK integration
-        - Sui Wallet connection
-        - environment variables file reading via custom hook useConfig
+- tic-tac-toe_client:
+    - Rust client 
 
-- setup
+- setup: Taken from https://github.com/MystenLabs/poc-template
     - A Typescript project, with ready-to-use:
         - environment variable (.env) file reading
         - Sui SDK integration
