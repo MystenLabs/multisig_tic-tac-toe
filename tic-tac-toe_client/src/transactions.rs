@@ -1,18 +1,20 @@
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::str::FromStr;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use fastcrypto::encoding::{Base64, Encoding};
 use move_core_types::language_storage::StructTag;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use shared_crypto::intent::{Intent, IntentMessage};
 use sui_keys::keystore::{AccountKeystore, FileBasedKeystore, Keystore};
 use sui_sdk::apis::ReadApi;
 use sui_sdk::json::SuiJsonValue;
 use sui_sdk::rpc_types::{
-    SuiData, SuiObjectDataFilter, SuiObjectDataOptions, SuiObjectResponseQuery,
-    SuiTransactionBlockResponse, SuiTransactionBlockResponseOptions,
+    SuiData, SuiMoveStruct, SuiMoveValue, SuiObjectDataFilter, SuiObjectDataOptions,
+    SuiObjectResponseQuery, SuiParsedData, SuiTransactionBlockResponse,
+    SuiTransactionBlockResponseOptions,
 };
 use sui_sdk::{SuiClient, SuiClientBuilder};
 use sui_transaction_builder::DataReader;
@@ -27,6 +29,9 @@ use sui_types::transaction::{ProgrammableTransaction, Transaction, TransactionDa
 use sui_types::Identifier;
 
 const TX_GAS_BUDGET: u64 = 10_000_000;
+const MODULE: &str = "multisig_tic_tac_toe";
+// const TIC_TAC_TOE_STRUCT: &str = "TicTacToe";
+const MARK_STRUCT: &str = "Mark";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 pub enum RowCol {
@@ -139,9 +144,59 @@ impl SuiConfig {
         }
     }
 
-    // TODO test: Seems to be working from println. But also need to test that it parses into the
-    // appropriate struct
-    pub async fn get_game(&self) -> Result<()> {
+    // TODO refactor: Use bcs to deserialize the object instead of SuiMoveValue unpacking
+    pub async fn my_marks(&self) -> Result<Vec<Mark>> {
+        let filter = SuiObjectDataFilter::StructType(StructTag {
+            address: self.package_id.into(),
+            module: Identifier::from_str(MODULE)?,
+            name: Identifier::from_str(MARK_STRUCT)?,
+            type_params: vec![],
+        });
+
+        // Probably here we could use with_bcs to make deserializing easier
+        let query =
+            SuiObjectResponseQuery::new(Some(filter), Some(SuiObjectDataOptions::full_content()));
+
+        let rpc_res = self
+            .sui_client
+            .read_api()
+            .get_owned_objects(self.my_address, Some(query), None, None)
+            .await?;
+
+        let marks = rpc_res
+            .data
+            .iter()
+            .filter_map(|resp| {
+                let sui_obj_resp = match resp.data.as_ref() {
+                    Some(data) => data.content.as_ref(),
+                    None => {
+                        return None;
+                    }
+                };
+
+                let sui_obj_data = match sui_obj_resp {
+                    Some(SuiParsedData::MoveObject(obj)) => &obj.fields,
+                    _ => {
+                        return None;
+                    }
+                };
+
+                let mark_fields = match sui_obj_data {
+                    SuiMoveStruct::WithFields(fields) => fields,
+                    _ => {
+                        return None;
+                    }
+                };
+
+                Mark::from_fields(mark_fields).ok()
+            })
+            .collect::<Vec<Mark>>();
+
+        Ok(marks)
+    }
+
+    // TODO refactor: use bcs to create TicTacToe struct instead of unpacking
+    pub async fn game(&self, id: ObjectID) -> Result<TicTacToe> {
         let my_key = self.keystore.get_key(&self.my_address)?;
         let pub_keys = vec![my_key.public().into(), self.opponent.pub_key.clone()];
 
@@ -149,24 +204,45 @@ impl SuiConfig {
         // TODO crosscheck: I can create SuiAddress from PublicKey but not the other way around?
         let multisig_addr: SuiAddress = (&multisig_pk).into();
 
-        let filter = SuiObjectDataFilter::StructType(StructTag {
-            address: self.package_id.into(),
-            module: Identifier::from_str("multisig_tic_tac_toe")?,
-            name: Identifier::from_str("TicTacToe")?,
-            type_params: vec![],
-        });
+        let filter = SuiObjectDataFilter::ObjectId(id);
+
         let query =
             SuiObjectResponseQuery::new(Some(filter), Some(SuiObjectDataOptions::full_content()));
 
-        let tic_tac_toe_objs = self
+        let rpc_res = self
             .sui_client
             .read_api()
             .get_owned_objects(multisig_addr, Some(query), None, None)
             .await?;
 
-        println!("tic_tac_toe_objs = {:#?}", tic_tac_toe_objs);
+        rpc_res
+            .data
+            .iter()
+            .find_map(|resp| {
+                let sui_obj_resp = match resp.data.as_ref() {
+                    Some(data) => data.content.as_ref(),
+                    None => {
+                        return None;
+                    }
+                };
 
-        todo!();
+                let sui_obj_data = match sui_obj_resp {
+                    Some(SuiParsedData::MoveObject(obj)) => &obj.fields,
+                    _ => {
+                        return None;
+                    }
+                };
+
+                let game_fields = match sui_obj_data {
+                    SuiMoveStruct::WithFields(fields) => fields,
+                    _ => {
+                        return None;
+                    }
+                };
+
+                TicTacToe::from_fields(game_fields).ok()
+            })
+            .ok_or(anyhow!("Did not find TicTacToe object with id = {}", id))
     }
 
     pub async fn create_game(&self) -> Result<SuiTransactionBlockResponse> {
@@ -197,7 +273,7 @@ impl SuiConfig {
             .single_move_call(
                 &mut builder,
                 package_id.clone(),
-                "multisig_tic_tac_toe",
+                MODULE,
                 "create_game",
                 vec![],
                 vec![
@@ -329,7 +405,7 @@ impl SuiConfig {
             .move_call(
                 *my_address,
                 *package_id,
-                "multisig_tic_tac_toe",
+                MODULE,
                 "send_mark_to_game",
                 vec![],
                 vec![
@@ -384,7 +460,7 @@ impl SuiConfig {
             .single_move_call(
                 &mut builder,
                 package_id.clone(),
-                "multisig_tic_tac_toe",
+                MODULE,
                 "place_mark",
                 vec![],
                 vec![
@@ -462,5 +538,111 @@ impl SuiConfig {
                 )
             .await
             .map_err(|e| anyhow!(e))
+    }
+}
+
+// TOPO refactor: use bcs to deserialize instead of unpacking SuiMoveValue
+// Data structure mirroring move object `multisig_tic_tac_toe::TicTacToe` for deserialization.
+#[derive(Deserialize, Debug)]
+pub struct TicTacToe {
+    id: ObjectID,
+    cur_turn: u8,
+    finished: bool,
+    gameboard: Vec<u8>,
+    x_addr: SuiAddress,
+    o_addr: SuiAddress,
+}
+
+impl TicTacToe {
+    pub fn from_fields(fields: &BTreeMap<String, SuiMoveValue>) -> Result<Self> {
+        let SuiMoveValue::UID{ id } = *fields
+            .get("id")
+            .ok_or(anyhow!("Missing field id"))? else {
+                bail!("Field id is not UID");
+            };
+        let SuiMoveValue::Number(cur_turn) = fields
+            .get("cur_turn")
+            .ok_or(anyhow!("Missing field cur_turn"))? else {
+                bail!("Field cur_turn is not Number");
+            };
+        let cur_turn = *cur_turn as u8;
+        let SuiMoveValue::Bool(finished) = *fields
+            .get("finished")
+            .ok_or(anyhow!("Missing field finished"))? else {
+                bail!("Field finished is not Bool");
+            };
+        let SuiMoveValue::Vector(gameboard) = fields
+            .get("gameboard")
+            .ok_or(anyhow!("Missing field gameboard"))? else {
+                bail!("Field gameboard is not Vector");
+            };
+        let gameboard = gameboard
+            .iter()
+            .map(|v| {
+                let SuiMoveValue::Number(n) = v else { panic!("Field gameboard is not Vector of Numbers") };
+                *n as u8
+            })
+            .collect::<Vec<u8>>();
+        let SuiMoveValue::Address(x_addr) = *fields
+            .get("x_addr")
+            .ok_or(anyhow!("Missing field x_addr"))? else {
+                bail!("Field x_addr is not Address");
+            };
+        let SuiMoveValue::Address(o_addr) = *fields
+            .get("o_addr")
+            .ok_or(anyhow!("Missing field o_addr"))? else {
+                bail!("Field o_addr is not Address");
+            };
+
+        Ok(Self {
+            id,
+            cur_turn,
+            finished,
+            gameboard,
+            x_addr,
+            o_addr,
+        })
+    }
+}
+
+// TODO refactor: use bcs to deserialize instead of unpacking SuiMoveValue
+// Data structure mirroring move object `multisig_tic_tac_toe::Mark` for deserialization.
+#[derive(Deserialize, Debug)]
+pub struct Mark {
+    id: ObjectID,
+    during_turn: bool,
+    from: SuiAddress,
+    game_id: ObjectID,
+    game_owners: SuiAddress,
+    placement: Option<u8>,
+}
+
+impl Mark {
+    pub fn from_fields(fields: &BTreeMap<String, SuiMoveValue>) -> Result<Self> {
+        let SuiMoveValue::UID{ id } = *fields.get("id").ok_or(anyhow!("Missing field id"))? else { bail!("Wrong type for field id") };
+        let SuiMoveValue::Bool(during_turn) = *fields.get("during_turn").ok_or(anyhow!("Missing field during_turn"))? else { bail!("Wrong type for field during_turn") };
+        let SuiMoveValue::Address(from) = *fields.get("from").ok_or(anyhow!("Missing field from"))? else { bail!("Wrong type for field from") };
+        let SuiMoveValue::Address(game_id) = *fields.get("game_id").ok_or(anyhow!("Missing field game_id"))? else { bail!("Wrong type for field game_id") };
+        let SuiMoveValue::Address(game_owners) = *fields.get("game_owners").ok_or(anyhow!("Missing field game_owners"))? else { bail!("Wrong type for field game_owners") };
+        let SuiMoveValue::Option(placement) = fields.get("placement").ok_or(anyhow!("Missing field placement"))? else { bail!("Wrong type for field placement") };
+        let placement = match placement.as_ref() {
+            Some(sui_value) => match sui_value {
+                SuiMoveValue::Number(val) => Some(*val as u8),
+                _ => None,
+            },
+            None => None,
+        };
+        Ok(Mark {
+            id,
+            during_turn,
+            from,
+            game_id: game_id.into(),
+            game_owners,
+            placement,
+        })
+    }
+
+    pub fn game_id(&self) -> ObjectID {
+        self.game_id
     }
 }

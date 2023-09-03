@@ -4,8 +4,8 @@ pub mod transactions;
 mod tests {
     use std::time::Duration;
 
-    use super::transactions::{SuiConfig, RowCol};
-    use anyhow::Result;
+    use super::transactions::{RowCol, SuiConfig};
+    use anyhow::{anyhow, Result};
     use sui_sdk::rpc_types::{ObjectChange, SuiTransactionBlockResponse};
 
     #[tokio::test]
@@ -16,6 +16,30 @@ mod tests {
             .select_gas(sui_config.my_address, None, 10_000_000, vec![])
             .await?;
         println!("gas = {:?}", gas);
+        Ok(())
+    }
+
+    // TODO refactor: Tests shouldn't depend on some existing state
+    #[tokio::test]
+    async fn test_my_marks() -> Result<()> {
+        let sui_config = SuiConfig::new_from_env().await?;
+        let marks = sui_config.my_marks().await?;
+
+        println!("marks = {:#?}", marks);
+        Ok(())
+    }
+
+    // TODO refactor: Tests shouldn't depend on some existing state
+    #[tokio::test]
+    async fn test_game() -> Result<()> {
+        let sui_config = SuiConfig::new_from_env().await?;
+        let marks = sui_config.my_marks().await?;
+
+        let game = sui_config
+            .game(marks.iter().next().ok_or(anyhow!("No mark found!"))?.game_id())
+            .await?;
+
+        println!("game = {:#?}", game);
         Ok(())
     }
 
@@ -57,14 +81,13 @@ mod tests {
 
         tokio::time::sleep(Duration::from_secs(4)).await;
 
-        sui_config.get_game().await.unwrap();
+        // sui_config.get_game().await.unwrap();
 
         Ok(())
     }
 
     #[tokio::test]
     async fn test_send_mark_to_game() -> Result<()> {
-
         let sui_config = SuiConfig::new_from_env().await?;
 
         let resp_create: SuiTransactionBlockResponse = sui_config.create_game().await?;
@@ -97,7 +120,9 @@ mod tests {
             .expect("Mark not found");
 
         // tokio::time::sleep(Duration::from_secs(1)).await;
-        let resp_send = sui_config.send_mark_to_game(mark.object_id(), RowCol::First, RowCol::Second).await?;
+        let resp_send = sui_config
+            .send_mark_to_game(mark.object_id(), RowCol::First, RowCol::Second)
+            .await?;
         assert!(resp_send.confirmed_local_execution.is_some());
 
         // println!("resp_send = {:#?}", resp_send);
@@ -107,7 +132,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_place_mark() -> Result<()> {
-
         let sui_config = SuiConfig::new_from_env().await?;
 
         let resp_create: SuiTransactionBlockResponse = sui_config.create_game().await?;
@@ -139,12 +163,16 @@ mod tests {
             .next()
             .expect("Mark not found");
 
-        let resp_send = sui_config.send_mark_to_game(mark.object_id(), RowCol::First, RowCol::Second).await?;
+        let resp_send = sui_config
+            .send_mark_to_game(mark.object_id(), RowCol::First, RowCol::Second)
+            .await?;
         assert!(resp_send.confirmed_local_execution.is_some());
 
         // println!("resp_send = {:#?}", resp_send);
 
-        let resp_place = sui_config.place_mark(tic_tac_toe.object_id(), mark.object_id()).await?;
+        let resp_place = sui_config
+            .place_mark(tic_tac_toe.object_id(), mark.object_id())
+            .await?;
         assert!(resp_place.confirmed_local_execution.is_some());
 
         println!("resp_place = {:#?}", resp_place);
