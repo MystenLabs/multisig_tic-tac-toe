@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -43,6 +46,19 @@ pub enum RowCol {
     Third,
 }
 
+impl FromStr for RowCol {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "0" => Ok(RowCol::First),
+            "1" => Ok(RowCol::Second),
+            "2" => Ok(RowCol::Third),
+            _ => Err(anyhow!("Invalid row/col: {}", s))
+        }
+    }
+}
+
 // TODO crosscheck: I thought the PublicKey can be extracted from SuiAddress, however after some
 // search in sui, I could not find such a function. I presume SuiAddress is independent of
 // PublicKey
@@ -58,6 +74,7 @@ pub struct SuiConfig {
     pub my_address: SuiAddress,
     pub opponent: SuiWeb3Player,
     pub package_id: ObjectID,
+    pub playing_as_o: bool,
 }
 
 impl SuiConfig {
@@ -68,16 +85,21 @@ impl SuiConfig {
         }
     }
 
-    pub async fn new_from_env() -> Result<Self> {
+    pub async fn new_from_env(playing_as_o: bool) -> Result<Self> {
+        let (my_addr, oppo_addr, oppo_pub_key) = if playing_as_o {
+            ("O_ADDRESS", "X_ADDRESS", "X_PUBLIC_KEY")
+        } else {
+            ("X_ADDRESS", "O_ADDRESS", "O_PUBLIC_KEY")
+        };
         dotenvy::dotenv().ok();
         let rpc_server_url = std::env::var("PROVIDER")?;
         let keystore_path = match std::env::var("KEYSTORE_PATH") {
             Ok(path) => PathBuf::from_str(&path)?,
             Err(_) => Self::default_keystore_path(),
         };
-        let my_address = SuiAddress::from_str(&std::env::var("MY_ADDRESS")?)?;
-        let opponent_address = SuiAddress::from_str(&std::env::var("OPPONENT_ADDRESS")?)?;
-        let opponent_pub_key = PublicKey::from_str(&std::env::var("OPPONENT_PUBLIC_KEY")?)
+        let my_address = SuiAddress::from_str(&std::env::var(my_addr)?)?;
+        let opponent_address = SuiAddress::from_str(&std::env::var(oppo_addr)?)?;
+        let opponent_pub_key = PublicKey::from_str(&std::env::var(oppo_pub_key)?)
             .map_err(|e| anyhow!("Cannot parse opponent public key: {}", e))?;
         let package_id = ObjectID::from_str(&std::env::var("PACKAGE_ID")?)?;
 
@@ -94,6 +116,7 @@ impl SuiConfig {
             my_address,
             opponent,
             package_id,
+            playing_as_o
         })
     }
 
@@ -198,12 +221,17 @@ impl SuiConfig {
     // TODO refactor: use bcs to create TicTacToe struct instead of unpacking
     pub async fn game(&self, id: ObjectID) -> Result<TicTacToe> {
         let my_key = self.keystore.get_key(&self.my_address)?;
-        let pub_keys = vec![my_key.public().into(), self.opponent.pub_key.clone()];
+        let pub_keys = if self.playing_as_o {
+            vec![self.opponent.pub_key.clone(), my_key.public().into()]
+        } else {
+            vec![my_key.public().into(), self.opponent.pub_key.clone()]
+        };
 
         let multisig_pk = MultiSigPublicKey::new(pub_keys, vec![1, 1], 1)?;
         // TODO crosscheck: I can create SuiAddress from PublicKey but not the other way around?
         let multisig_addr: SuiAddress = (&multisig_pk).into();
 
+        println!("MULTISIG ADDR = {}", multisig_addr);
         let filter = SuiObjectDataFilter::ObjectId(id);
 
         let query =
@@ -252,6 +280,7 @@ impl SuiConfig {
             my_address: my_x_address,
             opponent,
             package_id,
+            playing_as_o
         } = self;
 
         // 1. Produce the necessary information to work with mutlisig
@@ -259,7 +288,11 @@ impl SuiConfig {
         // 2](https://docs.sui.io/learn/cryptography/sui-multisig#step-2-create-a-multisig-address) in
         // the documentation
         let my_key = keystore.get_key(&my_x_address)?;
-        let pub_keys = vec![my_key.public().into(), opponent.pub_key.clone()];
+        let pub_keys = if *playing_as_o {
+            vec![opponent.pub_key.clone(), my_key.public().into()]
+        } else {
+            vec![my_key.public().into(), opponent.pub_key.clone()]
+        };
 
         let multisig_pk = MultiSigPublicKey::new(pub_keys, vec![1, 1], 1)?;
         // TODO crosscheck: I can create SuiAddress from PublicKey but not the other way around?
@@ -397,6 +430,7 @@ impl SuiConfig {
             my_address,
             opponent: _,
             package_id,
+            playing_as_o: _
         } = self;
 
         // Create the transaction
@@ -446,10 +480,15 @@ impl SuiConfig {
             my_address: my_x_address,
             opponent,
             package_id,
+            playing_as_o,
         } = self;
 
         let my_key = keystore.get_key(&my_x_address)?;
-        let pub_keys = vec![my_key.public().into(), opponent.pub_key.clone()];
+        let pub_keys = if *playing_as_o {
+            vec![opponent.pub_key.clone(), my_key.public().into()]
+        } else {
+            vec![my_key.public().into(), opponent.pub_key.clone()]
+        };
 
         let multisig_pk = MultiSigPublicKey::new(pub_keys, vec![1, 1], 1)?;
         let multisig_addr = (&multisig_pk).into();
@@ -603,6 +642,35 @@ impl TicTacToe {
             o_addr,
         })
     }
+
+    pub fn x_addr(&self) -> SuiAddress {
+        self.x_addr
+    }
+
+    pub fn o_addr(&self) -> SuiAddress {
+        self.o_addr
+    }
+
+    pub fn finished(&self) -> bool {
+        self.finished
+    }
+
+    pub fn cur_turn(&self) -> u8 {
+        self.cur_turn
+    }
+
+    pub fn gameboard(&self) -> &[u8] {
+        &self.gameboard
+    }
+
+    pub fn is_my_turn(&self, my_identity: SuiAddress) -> bool {
+        let current_player = if self.cur_turn % 2 == 0 {
+            self.x_addr
+        } else {
+            self.o_addr
+        };
+        current_player == my_identity
+    }
 }
 
 // TODO refactor: use bcs to deserialize instead of unpacking SuiMoveValue
@@ -640,6 +708,10 @@ impl Mark {
             game_owners,
             placement,
         })
+    }
+
+    pub fn id(&self) -> ObjectID {
+        self.id
     }
 
     pub fn game_id(&self) -> ObjectID {

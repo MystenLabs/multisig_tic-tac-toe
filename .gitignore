@@ -36,3 +36,6 @@ setup/*.env
 
 # rust
 tic-tac-toe_client/target
+
+# env file under the client directory
+tic-tac-toe_client/.env

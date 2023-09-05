@@ -163,6 +163,12 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
 
             // TODO: emit event of game-finished!
             return
+        } else if (game.cur_turn >= 8) {    // Draw
+            delete_mark(mark);
+            * &mut game.finished = true;
+
+            // TODO: emit event of game-finished!
+            return
         };
 
         // Next turn
