@@ -9,6 +9,8 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
     use sui::object::{Self, UID, ID};
     // TODO: events
     // use sui::event;
+    // TODO: clock to check that a player is not hanging the game
+    // use sui::clock;
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
 
@@ -18,6 +20,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
 
     const EInvalidSize: u64 = 0;
     const ETriedToCheat: u64 = 1;
+    const EMarkIsFromDifferentGame: u64 = 2;
 
 
     struct TicTacToeTrophy has key {
@@ -106,14 +109,8 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
 
     /// This is called by the multisig account to execute the last move by the player who used `send_mark_to_game`.
     public entry fun place_mark(game: &mut TicTacToe, mark: Mark, ctx: &mut TxContext) {
-        if (mark.game_id != object::uid_to_inner(&game.id)) {
-            // TODO event: emit event invalid turn
-
-            mark.during_turn = true;
-            let from = mark.from;
-            transfer::transfer(mark, from);
-            return
-        };
+        // Wrong game-mark combination.
+        assert!(mark.game_id != object::uid_to_inner(&game.id), EMarkIsFromDifferentGame);
 
         let addr = get_cur_turn_address(game);
         // Note here we empty the option
