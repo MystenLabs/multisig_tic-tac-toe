@@ -54,14 +54,11 @@ impl FromStr for RowCol {
             "0" => Ok(RowCol::First),
             "1" => Ok(RowCol::Second),
             "2" => Ok(RowCol::Third),
-            _ => Err(anyhow!("Invalid row/col: {}", s))
+            _ => Err(anyhow!("Invalid row/col: {}", s)),
         }
     }
 }
 
-// TODO crosscheck: I thought the PublicKey can be extracted from SuiAddress, however after some
-// search in sui, I could not find such a function. I presume SuiAddress is independent of
-// PublicKey
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SuiWeb3Player {
     pub address: SuiAddress,
@@ -116,7 +113,7 @@ impl SuiConfig {
             my_address,
             opponent,
             package_id,
-            playing_as_o
+            playing_as_o,
         })
     }
 
@@ -228,7 +225,6 @@ impl SuiConfig {
         };
 
         let multisig_pk = MultiSigPublicKey::new(pub_keys, vec![1, 1], 1)?;
-        // TODO crosscheck: I can create SuiAddress from PublicKey but not the other way around?
         let multisig_addr: SuiAddress = (&multisig_pk).into();
 
         println!("MULTISIG ADDR = {}", multisig_addr);
@@ -280,7 +276,7 @@ impl SuiConfig {
             my_address: my_x_address,
             opponent,
             package_id,
-            playing_as_o
+            playing_as_o,
         } = self;
 
         // 1. Produce the necessary information to work with mutlisig
@@ -295,7 +291,6 @@ impl SuiConfig {
         };
 
         let multisig_pk = MultiSigPublicKey::new(pub_keys, vec![1, 1], 1)?;
-        // TODO crosscheck: I can create SuiAddress from PublicKey but not the other way around?
         let multisig_addr = (&multisig_pk).into();
         // 1. End
 
@@ -430,7 +425,7 @@ impl SuiConfig {
             my_address,
             opponent: _,
             package_id,
-            playing_as_o: _
+            playing_as_o: _,
         } = self;
 
         // Create the transaction
