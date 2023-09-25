@@ -1,13 +1,17 @@
 use std::{
     fmt::Display,
     io::{stdin, stdout, Write},
-    str::FromStr, thread, time::Duration,
+    str::FromStr,
+    thread,
+    time::Duration,
 };
 
 use anyhow::Result;
 use async_recursion::async_recursion;
 use clap::Parser;
-use tic_tac_toe_client::transactions::{RowCol, SuiConfig};
+use sui_types::base_types::ObjectID;
+use tic_tac_toe_client::objects::RowCol;
+use tic_tac_toe_client::SuiConfig;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Player {
@@ -71,49 +75,89 @@ async fn main() -> Result<()> {
 
         // TODO refactor: get mark from response instead of my_marks
         let mark = config
-            .my_marks()
+            .fetch_my_marks()
             .await?
             .into_iter()
             .next()
             .expect("Could not find my mark");
 
-        let game = config.game(mark.game_id()).await?;
+        let game = config.fetch_game(mark.game_id()).await?;
 
         println!("Created new game, game id: {}", mark.game_id());
         println!("Player X: {}", game.x_addr());
         println!("Player O: {}", game.o_addr());
+        return next_turn(config, player, Some(mark.game_id())).await;
     }
 
     println!("Playing as {}", player);
-    next_turn(config, player).await
+    next_turn(config, player, None).await
 }
 
 #[async_recursion]
-async fn next_turn(config: SuiConfig, player: Player) -> Result<()> {
-    // TODO refactor: X already has the newest state of marks and game
-    if let Some(mark) = config.my_marks().await?.into_iter().next() {
-        let game = config.game(mark.game_id()).await?;
+async fn next_turn(config: SuiConfig, player: Player, mut game_id: Option<ObjectID>) -> Result<()> {
+    match game_id {
+        None => {
+            if let Some(mark) = config.fetch_my_marks().await?.into_iter().next() {
+                let game = config.fetch_game(mark.game_id()).await?;
 
-        print_gameboard(game.gameboard());
+                print_gameboard(game.gameboard());
 
-        if game.cur_turn() % 2 == (player.playing_as_o() as u8) {
-            println!("It's your turn! (Playing as {})", player);
-            let row = get_row_col_input(true);
-            let col = get_row_col_input(false);
+                // This shouldn't happen. We found my mark. However an extra check doesn't hurt
+                if game.cur_turn() % 2 == (player.playing_as_o() as u8) {
+                    println!("It's your turn! (Playing as {})", player);
+                    let row = get_row_col_input(true);
+                    let col = get_row_col_input(false);
 
-            let mut response = config.send_mark_to_game(mark.id(), row, col).await?;
-            assert!(response.confirmed_local_execution.unwrap());
+                    let mut response = config.send_mark_to_game(mark.id(), row, col).await?;
+                    assert!(response.confirmed_local_execution.unwrap());
 
-            response = config.place_mark(mark.game_id(), mark.id()).await?;
-            assert!(response.confirmed_local_execution.unwrap());
+                    response = config.place_mark(mark.game_id(), mark.id()).await?;
+                    assert!(response.confirmed_local_execution.unwrap());
+                }
+                game_id = Some(mark.game_id());
+            } else {
+                println!("Waiting for opponnent...");
+                thread::sleep(Duration::from_secs(5));
+            }
         }
-    // } else if { // TODO finish conditions
-    } else {
-        println!("Waiting for opponnent...");
-        thread::sleep(Duration::from_secs(5));
-    }
+        Some(game_id) => {
+            let game = config.fetch_game(game_id).await?;
 
-    next_turn(config, player).await
+            if game.finished() {
+                println!("Game has finished!");
+                print_gameboard(game.gameboard());
+                return Ok(());
+            }
+
+            if let Some(mark) = config
+                .fetch_my_marks()
+                .await?
+                .into_iter()
+                .filter(|m| m.game_id() == game_id)
+                .collect::<Vec<_>>()
+                .first()
+            {
+
+                print_gameboard(game.gameboard());
+                // This shouldn't happen. We found my mark. However an extra check doesn't hurt
+                if game.cur_turn() % 2 == (player.playing_as_o() as u8) {
+                    println!("It's your turn! (Playing as {})", player);
+                    let row = get_row_col_input(true);
+                    let col = get_row_col_input(false);
+
+                    let mut response = config.send_mark_to_game(mark.id(), row, col).await?;
+                    assert!(response.confirmed_local_execution.unwrap());
+
+                    response = config.place_mark(mark.game_id(), mark.id()).await?;
+                    assert!(response.confirmed_local_execution.unwrap());
+                }
+            } else {
+                println!("Waiting for opponnent...");
+                thread::sleep(Duration::from_secs(5));
+            }
+        }
+    }
+    next_turn(config, player, game_id).await
 }
 
 // Helper function for getting console input

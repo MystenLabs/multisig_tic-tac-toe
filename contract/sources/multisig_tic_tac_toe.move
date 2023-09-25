@@ -110,7 +110,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
     /// This is called by the multisig account to execute the last move by the player who used `send_mark_to_game`.
     public entry fun place_mark(game: &mut TicTacToe, mark: Mark, ctx: &mut TxContext) {
         // Wrong game-mark combination.
-        assert!(mark.game_id != object::uid_to_inner(&game.id), EMarkIsFromDifferentGame);
+        assert!(mark.game_id == object::uid_to_inner(&game.id), EMarkIsFromDifferentGame);
 
         let addr = get_cur_turn_address(game);
         // Note here we empty the option

@@ -19,9 +19,9 @@ async fn test_select_gas() -> Result<()> {
 // TODO refactor: Tests shouldn't depend on some existing state
 // This depends on my_address having a Mark
 #[tokio::test]
-async fn test_my_marks() -> Result<()> {
+async fn test_fetch_my_marks() -> Result<()> {
     let sui_config = SuiConfig::new_from_env(false).await?;
-    let marks = sui_config.my_marks().await?;
+    let marks = sui_config.fetch_my_marks().await?;
 
     println!("marks = {:#?}", marks);
     Ok(())
@@ -30,12 +30,12 @@ async fn test_my_marks() -> Result<()> {
 // TODO refactor: Tests shouldn't depend on some existing state
 // This test depends on a created game and a Mark under my_address
 #[tokio::test]
-async fn test_game() -> Result<()> {
+async fn test_fetch_game() -> Result<()> {
     let sui_config = SuiConfig::new_from_env(false).await?;
-    let marks = sui_config.my_marks().await?;
+    let marks = sui_config.fetch_my_marks().await?;
 
     let game = sui_config
-        .game(
+        .fetch_game(
             marks
                 .iter()
                 .next()
