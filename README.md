@@ -34,7 +34,7 @@ sequenceDiagram
 | In respect to shared-object | In respect to transferring back and forth |
 | --- | --- |
 | ~~+ Ability to delete object after game finished~~ | + Ability to use the object asynchronously |
-| + No order consensus needed |  |
+| + No order consensus needed | + Ability to disable user-not-playing "cheat" without shared-object (clock) |
 | - Way more complicated contract | - More complicated contract |
 | - More complicated client integration | - More complicated client integration |
 | - More transactions per action |  |
