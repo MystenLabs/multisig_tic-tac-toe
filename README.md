@@ -31,10 +31,10 @@ sequenceDiagram
 
 ## Pros & Cons of pattern
 
-| In respect to shared-object | In respect to transferring back and forth |
+| In respect to shared-object | In respect to game-admin |
 | --- | --- |
-| ~~+ Ability to delete object after game finished~~ | + Ability to use the object asynchronously |
-| + No order consensus needed | + Ability to disable user-not-playing "cheat" without shared-object (clock) |
+| ~~+ Ability to delete object after game finished~~ | + No need for a third entity |
+| + No order consensus needed | |
 | - Care should be taken to prevent equivocation | - Care should be taken to prevent equivocation |
 | - Way more complicated contract | - More complicated contract |
 | - More complicated client integration | - More complicated client integration |
