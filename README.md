@@ -17,15 +17,20 @@ A potential application of this pattern is the case when we want an object to be
 sequenceDiagram
     Player X->>+Multisig: Create game
     Multisig-->>+Player X: Pass mark
-    Player X->>-Multisig: Send and place mark
+    Player X->>-Multisig: Send mark
+    Multisig->>Multisig: Place mark
     Multisig-->>+Player O: Pass mark
-    Player O->>-Multisig: Send and place mark
+    Player O->>-Multisig: Send mark
+    Multisig->>Multisig: Place mark
     Multisig-->>+Player X: Pass mark
-    Player X->>-Multisig: Send and place mark
+    Player X->>-Multisig: Send mark
+    Multisig->>Multisig: Place mark
     Multisig-->>+Player O: ...
     Player O->>-Multisig: ...
+    Multisig->>Multisig: ...
     Multisig-->>+Player X: ...
     Player X->>-Multisig: ...
+    Multisig->>Multisig: ...
     Multisig->>+Player O: [Trophy]
 ```
 
