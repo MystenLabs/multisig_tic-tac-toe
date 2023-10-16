@@ -60,6 +60,9 @@ sequenceDiagram
         - Sui SDK integration
         - publish shell script
 
+- app: Vite React application for playing in the browser
+    - `pnpm run dev`
+
 ## Try it out:
 
 setup/publish.sh uses environment variables `$USER1_ADDRESS` and `$USER3_ADDRESS` for players X and O.
