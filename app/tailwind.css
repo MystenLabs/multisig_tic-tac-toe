@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.connect-button-container button {
+    background-color: lightsteelblue
+}
+
+.uploadcare--button_primary {
+  background-color: #157cfc;
+}

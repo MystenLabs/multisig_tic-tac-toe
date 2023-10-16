@@ -22,12 +22,12 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
     const ETriedToCheat: u64 = 1;
     const EMarkIsFromDifferentGame: u64 = 2;
 
-
     struct TicTacToeTrophy has key {
         id: UID,
         winner: address,
         loser: address,
-        played_as: u8
+        played_as: u8,
+        game_id: ID
     }
 
     struct TicTacToe has key {
@@ -38,7 +38,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
         cur_turn: u8,
         x_addr: address,
         o_addr: address,
-        finished: bool
+        finished: u8 // 0 not finished, 1 X Winner, 2 O Winner, 3 Draw
     }
 
     // TODO refactor?: It seems extravagant keeping both the from address and the game_id.
@@ -74,7 +74,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
             cur_turn: 0,
             x_addr,
             o_addr,
-            finished: false
+            finished: 0
         };
         let mark = Mark {
             id: object::new(ctx),
@@ -138,10 +138,10 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
         // Game ended!
         if (option::is_some(&winner)) {
             let played_as = option::extract(&mut winner);
-            let (winner, loser) = if (played_as == MARK_X) {
-                (game.x_addr, game.o_addr)
+            let (winner, loser, finished) = if (played_as == MARK_X) {
+                (game.x_addr, game.o_addr, 1)
             } else {
-                (game.o_addr, game.x_addr)
+                (game.o_addr, game.x_addr, 2)
             };
 
             transfer::transfer(
@@ -149,20 +149,21 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
                     id: object::new(ctx),
                     winner,
                     loser,
-                    played_as
+                    played_as,
+                    game_id: object::uid_to_inner(&game.id)
                 },
                 winner
             );
 
             // object deletions
             delete_mark(mark);
-            * &mut game.finished = true;
+            * &mut game.finished = finished;
 
             // TODO: emit event of game-finished!
             return
         } else if (game.cur_turn >= 8) {    // Draw
             delete_mark(mark);
-            * &mut game.finished = true;
+            * &mut game.finished = 3;
 
             // TODO: emit event of game-finished!
             return
@@ -186,7 +187,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
             o_addr: _,
             finished
         } = game;
-        assert!(finished, ETriedToCheat);
+        assert!(finished != 0, ETriedToCheat);
         object::delete(id);
     }
 
