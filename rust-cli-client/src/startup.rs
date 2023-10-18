@@ -58,8 +58,10 @@ impl Config {
     rename_all = "kebab-case"
 )]
 pub struct TicTacToeOpts {
+    /// Your private key in base64
     #[arg(short, long, required = true)]
     private_key: String,
+    /// Opponent's public key in base64
     #[arg(short, long, required = true)]
     opponent_public_key: String,
     /// X | O
