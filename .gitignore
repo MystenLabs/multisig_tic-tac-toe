@@ -35,7 +35,8 @@ setup/*.env
 .faucet.res.json
 
 # rust
-tic-tac-toe_client/target
+rust-cli-client/target
+
 
 # env file under the client directory
 tic-tac-toe_client/.env

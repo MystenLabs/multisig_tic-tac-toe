@@ -70,15 +70,6 @@ API_ENV
 # NEXT_BACKEND_API=$BACKEND_API
 # VITE_API_ENV
 
-cat >../tic-tac-toe_client/.env<<-CLIENT_API_ENV
-PROVIDER=$NETWORK
-PACKAGE_ID=$PACKAGE_ID
-X_ADDRESS=$USER1_ADDRESS
-X_PUBLIC_KEY=$USER1_PUBLIC_KEY
-O_ADDRESS=$USER3_ADDRESS
-O_PUBLIC_KEY=$USER3_PUBLIC_KEY
-CLIENT_API_ENV
-
 # commented out as the POC template does not have an api directory
 
 # cat >../api/.env$suffix<<-BACKEND_API_ENV
