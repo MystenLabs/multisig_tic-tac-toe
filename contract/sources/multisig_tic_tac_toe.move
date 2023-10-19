@@ -41,16 +41,12 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
         finished: u8 // 0 not finished, 1 X Winner, 2 O Winner, 3 Draw
     }
 
-    // TODO refactor?: It seems extravagant keeping both the from address and the game_id.
-    // PROBABLY the from should suffice
     struct Mark has key {
         id: UID,
         /// Column major 3x3 placement
         placement: Option<u8>,
         /// Flag that sets when the Mark is owned by a player
         during_turn: bool,
-        /// Player that sent the mark
-        from: address,
         /// Multi-sig account to place the mark
         game_owners: address,
         /// TicTacToe object this mark is part of
@@ -59,10 +55,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
 
     /// This should be called by a multisig (1 out of 2) address.
     /// x_addr and o_addr should be the two addresses part-taking in the multisig.
-    /// TODO: is there any way to check this?
-    /// As multisig addresses can be created from the public keys, checking should be feasible.
     public entry fun create_game(x_addr: address, o_addr: address, ctx: &mut TxContext) {
-        // TODO: check x_addr, o_addr are part of the multisig address
         let id = object::new(ctx);
         let game_id = object::uid_to_inner(&id);
 
@@ -80,12 +73,11 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
             id: object::new(ctx),
             placement: option::none(),
             during_turn: true, // Mark is passed to x_addr
-            from: x_addr,
             game_owners: tx_context::sender(ctx),
             game_id
         };
 
-        // TODO maybe: event?
+        // TODO?: event: game-created
 
         transfer::transfer(tic_tac_toe, tx_context::sender(ctx));
         transfer::transfer(mark, x_addr);
@@ -94,9 +86,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
     /// This is called by the one of the two addresses participating in the multisig, but not from the multisig itself.
     /// row: [0 - 2], col: [0 - 2]
     public entry fun send_mark_to_game(mark: Mark, row: u8, col: u8) {
-        // This is the way to test that the correct address calls this function.
-        // TODO learn: Also maybe transer::transfer would fail anyway as it is already owned by mark.game_owners
-        // If this is the case, we do not really need mark.during_turn
+        // Mark.during_turn prevents multisig-acc from editing mark.placement after it has been sent to it.
         assert!(mark.during_turn, ETriedToCheat);
 
         option::fill(&mut mark.placement, get_index(row, col));
@@ -104,10 +94,12 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
         let game_owners = mark.game_owners;
         transfer::transfer(mark, game_owners);
 
-        // TODO: event
+        // TODO: event: mark-sent
     }
 
     /// This is called by the multisig account to execute the last move by the player who used `send_mark_to_game`.
+    /// TODO: Maybe we can pass TicTacToe "by value" in order to be able to burn it directly on game-finished,
+    /// while returning it to the owner (multisig-acc) otherwise
     public entry fun place_mark(game: &mut TicTacToe, mark: Mark, ctx: &mut TxContext) {
         // Wrong game-mark combination.
         assert!(mark.game_id == object::uid_to_inner(&game.id), EMarkIsFromDifferentGame);
@@ -117,7 +109,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
         let placement: u8 = option::extract(&mut mark.placement);
         if (get_cell_by_index(&game.gameboard, placement) != MARK_EMPTY) {
 
-            // TODO: emit event invalid turn
+            // TODO: event: invalid turn
 
             mark.during_turn = true;
             transfer::transfer(mark, addr);
@@ -159,23 +151,22 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
             delete_mark(mark);
             * &mut game.finished = finished;
 
-            // TODO: emit event of game-finished!
+            // TODO: event: game-finished
             return
         } else if (game.cur_turn >= 8) {    // Draw
             delete_mark(mark);
             * &mut game.finished = 3;
 
-            // TODO: emit event of game-finished!
+            // TODO: event: game-finished!
             return
         };
 
         // Next turn
         * &mut game.cur_turn = game.cur_turn + 1;
         addr = get_cur_turn_address(game);
-        mark.from = addr;
         mark.during_turn = true;
         transfer::transfer(mark, addr);
-        //TODO: event
+        //TODO: event: mark-placed
     }
 
     public entry fun delete_game(game: TicTacToe) {
@@ -197,7 +188,6 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
             id,
             placement: _,
             during_turn: _,
-            from: _,
             game_owners:_ ,
             game_id: _
         } = mark;

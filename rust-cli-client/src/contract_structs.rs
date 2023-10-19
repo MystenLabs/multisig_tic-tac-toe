@@ -94,8 +94,6 @@ pub struct Mark {
     pub placement: Option<u8>,
     /// Flag that sets when the Mark is owned by a player
     pub during_turn: bool,
-    /// Player that sent the mark
-    pub from: SuiAddress,
     /// Multi-sig account to place the mark
     pub game_owners: SuiAddress,
     /// TicTacToe object this mark is part of

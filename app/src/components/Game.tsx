@@ -26,7 +26,6 @@ type MarkMoveObject = {
     game_id: string,
     placement?: number,
     during_turn: boolean,
-    from: string,
     game_owners: string,
 };
 
