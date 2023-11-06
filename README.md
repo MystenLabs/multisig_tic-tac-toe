@@ -34,6 +34,13 @@ sequenceDiagram
     Multisig->>+Player O: [Trophy]
 ```
 
+- Create game: Using the `create_game` move call from the multisig account, a game is created and a mark is passed to player X.
+- Send mark: Using the `send_mark` move call from the player account, the mark is sent to the multisig account.
+- Place mark: Using the `place_mark` move call from the multisig account, the mark is placed on the gameboard, and is passed to the next player for the next turn.
+- Pass mark is not a separate call. It is an action that is automatically triggered either when creating a game or when placing a mark while the game is not finished.
+
+All multisig calls are sponsored by the player account.
+
 ## Pros & Cons of pattern
 
 | In respect to shared-object | In respect to game-admin |
@@ -51,30 +58,18 @@ sequenceDiagram
 - contract:
     - Contains the Move code of the smart contract
 
-- tic-tac-toe_client:
-    - Rust client 
+- rust-cli-client:
+    - `cargo run -- --private-key <PRIVATE_KEY> --opponent-public-key <OPPONENT_PUBLIC_KEY> <PLAYING_AS>` where keys in Base64 and PLAYING_AS: X|O.
+    One can find private keys in _~/.sui/sui_config/sui.keystore_ and public keys using `sui keystore list`.
+    - Note: Application supports only Ed25519 keyscheme
+
+- app: vite react application for playing in the browser
+    - `pnpm run dev`
+    - Note: Application supports only Ed25519 keyscheme
 
 - setup: Taken from https://github.com/MystenLabs/poc-template
     - A Typescript project, with ready-to-use:
         - environment variable (.env) file reading
         - Sui SDK integration
         - publish shell script
-
-- app: Vite React application for playing in the browser
-    - `pnpm run dev`
-
-## Try it out:
-
-setup/publish.sh uses environment variables `$USER1_ADDRESS` and `$USER3_ADDRESS` for players X and O.
-```bash
-./publish.sh [local]
-```
-
-Run the game in separate terminals:
-```bash
-cargo run -- --player x
-```
-```bash
-cargo run -- --player o
-```
 
