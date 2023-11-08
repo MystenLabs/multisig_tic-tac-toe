@@ -8,6 +8,9 @@ import { Ed25519PublicKey } from '@mysten/sui.js/keypairs/ed25519';
 import { fromB64, toB64 } from '@mysten/bcs';
 import { SIGNATURE_SCHEME_TO_FLAG } from '@mysten/sui.js/cryptography';
 
+// TODO: move functions to helpers and custom hook files
+// TODO: move types to types folder
+
 type GameMoveObject = {
     cur_turn: number,
     finished: number,

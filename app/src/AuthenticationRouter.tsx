@@ -12,6 +12,9 @@ export const AuthenticationRouter = () => {
     if (status === "CONNECTED" && currentAccount) {
       setConnected(true);
     }
+    else {
+      setConnected(false);
+    }
     console.log(currentAccount?.address);
   }, [status, currentAccount]);
 
