@@ -2,9 +2,8 @@ import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useWalletKit } from '@mysten/wallet-kit';
 import { useGame } from '../hooks/useGame';
+import { ed25519PublicKeyB64 } from '../helpers/keys';
 
-// TODO: move functions to helpers and custom hook files
-// TODO: move types to types folder
 function Game() {
     const { currentAccount } = useWalletKit();
     const { oppoPubKey, gameId } = useParams<{ oppoPubKey: string, gameId: string }>();
@@ -18,14 +17,13 @@ function Game() {
     const oppoPubKeyAsStr = oppoPubKey as string;
     const gameIdAsStr = gameId as string;
 
-    const { 
+    const {
         handleClick,
         renderSquare,
         updateGameState,
         getCurrentTurnText,
         getFinishedText,
-        ed25519PublicKeyB64
-    } = useGame({oppoPubKey: oppoPubKeyAsStr, gameId: gameIdAsStr});
+    } = useGame({ oppoPubKey: oppoPubKeyAsStr, gameId: gameIdAsStr });
 
     // REVIEW
     // Poll the blockchain every 1 sec
@@ -42,13 +40,12 @@ function Game() {
 
     return (
         <div className='tw-text-center tw-flex tw-flex-col tw-w-full tw-items-center'>
-            <h1>Multisig Tic Tac Toe</h1>
+            <h1>{getCurrentTurnText()}</h1>
             <div className='tw-text-left'>
                 <p>
                     My Public Key: {currentAccount && ed25519PublicKeyB64(currentAccount.publicKey)}<br />
                     (Share it with opponent to join game)</p>
-                <p>Game ID: {gameId}<br />
-                    {getCurrentTurnText()}</p>
+                <p>Game ID: {gameId}</p>
             </div>
             <table>
                 <tbody>

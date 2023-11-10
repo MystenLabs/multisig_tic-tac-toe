@@ -1,129 +1,23 @@
-import { SuiClient } from '@mysten/sui.js/client';
-import { MouseEventHandler, useState } from 'react';
-import { PACKAGE_ADDRESS, SUI_FULLNODE_URL, multisigPubKey } from '../config';
-import { TransactionBlock } from '@mysten/sui.js/transactions';
 import { Ed25519PublicKey } from '@mysten/sui.js/keypairs/ed25519';
-import { fromB64, toB64 } from '@mysten/bcs';
-import { SIGNATURE_SCHEME_TO_FLAG } from '@mysten/sui.js/cryptography';
+import { MouseEvent, useState } from 'react';
+import { MoveStructGame } from '../types/game-move';
+import { MoveStructMark } from '../types/mark-move';
+import { PACKAGE_ADDRESS, SUI_FULLNODE_URL } from '../config';
+import { SuiClient } from '@mysten/sui.js/client';
+import { TransactionBlock } from '@mysten/sui.js/transactions';
+import { fetchGame } from '../helpers/sui-fetch';
+import { fromB64 } from '@mysten/bcs';
+import { multisigPubKey } from '../helpers/keys';
+import { sendMarkTxb } from '../helpers/txs';
 import { useWalletKit } from '@mysten/wallet-kit';
 
-type GameMoveObject = {
-    cur_turn: number,
-    finished: number,
-    gameboard: number[],
-    id: {
-        id: string
-    },
-    o_addr: string,
-    x_addr: string
-};
-
-type MarkMoveObject = {
-    id: {
-        id: string
-    },
-    game_id: string,
-    placement?: number,
-    during_turn: boolean,
-    game_owners: string,
-};
-
-async function fetchGame(gameId: string) {
-    // TODO hardcoded: Find network from wallet
-    const suiClient = new SuiClient({ url: SUI_FULLNODE_URL });
-
-    const gameResp = await suiClient.getObject({
-        id: gameId!,
-        options: { showContent: true }
-    });
-
-    const fetchedGame = gameResp.data;
-    if (!fetchedGame) {
-        console.log('Game not found');
-        return;
-    }
-    const suiParsedData = fetchedGame.content as {
-        dataType: 'moveObject';
-        fields: GameMoveObject;
-        hasPublicTransfer: boolean;
-        type: string;
-    };
-
-    return suiParsedData.fields;
-}
-
-async function fetchMark(owner: string, gameId: string) {
-    const suiClient = new SuiClient({ url: SUI_FULLNODE_URL });
-
-    const marksResp = await suiClient.getOwnedObjects({
-        owner,
-        filter: {
-            StructType: `${PACKAGE_ADDRESS}::multisig_tic_tac_toe::Mark`
-        },
-        options: {
-            showContent: true
-        }
-    });
-
-    const fetchedMarks = marksResp.data.filter((mark) => {
-        const suiParsedData = mark.data?.content as {
-            dataType: 'moveObject';
-            fields: MarkMoveObject;
-            hasPublicTransfer: boolean;
-            type: string;
-        };
-        return suiParsedData.fields.game_id === gameId;
-    });
-    if (!fetchedMarks.length) {
-        console.log('Marks not found');
-        return;
-    }
-    const content0 = fetchedMarks[0]?.data?.content as {
-        dataType: 'moveObject';
-        fields: MarkMoveObject;
-        hasPublicTransfer: boolean;
-        type: string;
-    };
-    return content0.fields;
-}
-
-async function sendMarkTxb(address: string, gameId: string, placement: number) {
-
-    const fetchedMark = await fetchMark(address, gameId);
-    if (!fetchedMark) {
-        console.log("No mark object");
-        return;
-    }
-
-    // get row/col from col-major index
-    const row = placement % 3;
-    const col = Math.floor(placement / 3);
-
-    const txb = new TransactionBlock();
-
-    txb.moveCall({
-        target: `${PACKAGE_ADDRESS}::multisig_tic_tac_toe::send_mark_to_game`,
-        arguments: [
-            txb.object(fetchedMark.id.id),
-            txb.pure.u8(row),
-            txb.pure.u8(col)
-        ]
-    });
-
-    return { txb, fetchedMark };
-}
-
-
 export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: string }) {
-
     const { currentAccount, signTransactionBlock, signAndExecuteTransactionBlock } = useWalletKit();
-    const [game, setGame] = useState<GameMoveObject | undefined>();
-    // const [mark, setMark] = useState<MarkMoveObject | undefined>();
+    const [game, setGame] = useState<MoveStructGame | undefined>();
     const [board, setBoard] = useState<number[]>([]);
-    // const [isYourTurn, setIsYourTurn] = useState(false);
     const [trophyId, setTrophyId] = useState<{ won: boolean, trophyId: string } | undefined>();
 
-    const isYourTurnFun = (curTurn: number) => {
+    function isYourTurnFun(curTurn: number) {
         if (!game || !currentAccount) {
             return false;
         }
@@ -132,11 +26,11 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
             return true
         }
         return false;
-    };
+    }
 
-    const handleClick: MouseEventHandler<HTMLTableDataCellElement> = async (e) => {
+    async function handleClick(e: MouseEvent) {
         if (!isYourTurnFun(game!.cur_turn)) {
-            // TODO: Popups instead
+            // TODO: Toaster instead
             console.log("Not your turn yet");
             return;
         }
@@ -153,7 +47,7 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
             return;
         }
 
-        const placement = parseInt((e.target as HTMLTableDataCellElement).id);
+        const placement = parseInt((e.target as HTMLElement).id);
         if (board[placement] !== 0) {
             console.log("Invalid placement");
             return;
@@ -173,7 +67,7 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
         }
         const multiSigAddr = multiSigPublicKey.toSuiAddress();
 
-        // TODO hardcoded: Find network from wallet
+        // REVIEW hardcoded: Find network from wallet
         const suiClient = new SuiClient({ url: SUI_FULLNODE_URL });
 
         let mark;
@@ -186,19 +80,21 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
                 options: {
                     showEffects: true
                 }
+            }).catch((e) => {
+                console.log("Send mark txb call threw an error:");
+                console.log(e);
             });
 
-            if (resp1.errors) {
+            if (resp1?.errors) {
                 console.log("Error executing transaction block");
                 console.log(resp1.errors);
                 return;
-            } else if (resp1.effects?.status?.status !== 'success') {
+            } else if (resp1?.effects?.status?.status !== 'success') {
                 console.log("Failure executing transaction block");
-                console.log(resp1.effects?.status);
+                console.log(resp1?.effects?.status);
                 return;
             }
         } else { // mark could be on the multisigAddr
-            // const suiClient = new SuiClient({ url: SUI_FULLNODE_URL });
             const marksResp = await suiClient.getOwnedObjects({
                 owner: multiSigAddr,
                 filter: {
@@ -212,7 +108,7 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
             const marks = marksResp.data.filter((markResp) => {
                 const suiParsedData = markResp.data?.content as {
                     dataType: 'moveObject';
-                    fields: MarkMoveObject;
+                    fields: MoveStructMark;
                     hasPublicTransfer: boolean;
                     type: string;
                 };
@@ -221,7 +117,7 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
 
             mark = (marks[0].data!.content as {
                 dataType: 'moveObject';
-                fields: MarkMoveObject;
+                fields: MoveStructMark;
                 hasPublicTransfer: boolean;
                 type: string;
             }).fields;
@@ -252,36 +148,34 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
 
         const combinedSignature = multiSigPublicKey.combinePartialSignatures([mySignature]);
 
-        try {
-            const resp2 = await suiClient.executeTransactionBlock({
-                transactionBlock: transactionBlockBytes,
-                signature: [combinedSignature, mySignature],
-                options: {
-                    showEvents: true,
-                    showEffects: true,
-                    showObjectChanges: true,
-                    showBalanceChanges: true,
-                    showInput: true,
-                }
-            });
-
-            if (resp2.errors) {
-                console.log("Error executing transaction block");
-                console.log(resp2.errors);
-                return;
-            } else if (resp2.effects?.status?.status !== 'success') {
-                console.log("Failure executing transaction block");
-                console.log(resp2.effects?.status);
-                return;
+        const resp2 = await suiClient.executeTransactionBlock({
+            transactionBlock: transactionBlockBytes,
+            signature: [combinedSignature, mySignature],
+            options: {
+                showEvents: true,
+                showEffects: true,
+                showObjectChanges: true,
+                showBalanceChanges: true,
+                showInput: true,
             }
-        } catch (e) {
-            console.log("Executing multisig transaction threw exception:");
+        }).catch((e) => {
+            console.log("Place mark txb call threw an error:");
             console.log(e);
+        });
+
+
+        if (resp2?.errors) {
+            console.log("Error executing transaction block");
+            console.log(resp2.errors);
+            return;
+        } else if (resp2?.effects?.status?.status !== 'success') {
+            console.log("Failure executing transaction block");
+            console.log(resp2?.effects?.status);
             return;
         }
 
         await updateGameState();
-    };
+    }
 
     function renderSquare(index: number) {
         return board[index] === 1 ? 'X' : board[index] === 2 ? 'O' : ' ';
@@ -388,17 +282,11 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
         }
     }
 
-    function ed25519PublicKeyB64(pk: Uint8Array) {
-        const pkNew = new Uint8Array([SIGNATURE_SCHEME_TO_FLAG['ED25519'], ...pk]);
-        return toB64(pkNew);
-    }
-
     return {
         handleClick,
         renderSquare,
         updateGameState,
         getCurrentTurnText,
         getFinishedText,
-        ed25519PublicKeyB64
     };
 }

@@ -1,9 +1,9 @@
-import { createBrowserRouter } from "react-router-dom";
-import { NotFoundPage } from "../pages/NotFoundPage";
-import { AuthenticationRouter } from "../AuthenticationRouter";
 import CreateOrJoinGame from "../components/CreateOrJoinGame";
 import Game from "../components/Game";
+import { AuthenticationRouter } from "../AuthenticationRouter";
 import { Layout } from "../Layout";
+import { NotFoundPage } from "../pages/NotFoundPage";
+import { createBrowserRouter } from "react-router-dom";
 
 export const router = createBrowserRouter([
   {

@@ -1,5 +1,6 @@
-import { useCreateOrJoinGame } from "../hooks/useCreateOrJoinGame";
 import "../../tailwind.css";
+import { ed25519PublicKeyB64 } from "../helpers/keys";
+import { useCreateOrJoinGame } from "../hooks/useCreateOrJoinGame";
 import { useWalletKit } from "@mysten/wallet-kit";
 
 function CreateOrJoinGame() {
@@ -11,7 +12,6 @@ function CreateOrJoinGame() {
     handleOpponentChange,
     handleCreateGame,
     handleJoinGame,
-    ed25519PublicKeyB64,
   } = useCreateOrJoinGame();
 
   return (
