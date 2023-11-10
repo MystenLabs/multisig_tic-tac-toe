@@ -10,7 +10,13 @@ export async function fetchGame(gameId: string) {
     const gameResp = await suiClient.getObject({
         id: gameId!,
         options: { showContent: true }
+    }).catch((err) => {
+        console.log("SuiClient.getObject threw:");
+        console.log(err);
     });
+    if (!gameResp) {
+        return;
+    }
 
     const fetchedGame = gameResp.data;
     if (!fetchedGame) {
@@ -70,7 +76,13 @@ export async function fetchMark(owner: string, gameId: string) {
         options: {
             showContent: true
         }
+    }).catch((err) => {
+        console.log("SuiClient.getOwnedObjects threw:");
+        console.log(err);
     });
+    if (!marksResp) {
+        return;
+    }
 
     const fetchedMarks = marksResp.data.filter((mark) => {
         const suiParsedData = mark.data?.content as {
@@ -82,7 +94,7 @@ export async function fetchMark(owner: string, gameId: string) {
         return suiParsedData.fields.game_id === gameId;
     });
     if (!fetchedMarks.length) {
-        console.log('Marks not found');
+        console.log('No marks found');
         return;
     }
     const content0 = fetchedMarks[0]?.data?.content as {

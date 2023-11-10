@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useWalletKit } from '@mysten/wallet-kit';
 import { useGame } from '../hooks/useGame';
@@ -20,23 +19,9 @@ function Game() {
     const {
         handleClick,
         renderSquare,
-        updateGameState,
         getCurrentTurnText,
         getFinishedText,
     } = useGame({ oppoPubKey: oppoPubKeyAsStr, gameId: gameIdAsStr });
-
-    // REVIEW
-    // Poll the blockchain every 1 sec
-    useEffect(() => {
-        // Create an interval that updates the state every 1 second
-        const intervalId = setInterval(() => {
-            updateGameState();
-        }, 1000); // 1000 milliseconds = 1 second
-
-        // Clean up the interval when the component unmounts
-        return () => clearInterval(intervalId);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Only run once
 
     return (
         <div className='tw-text-center tw-flex tw-flex-col tw-w-full tw-items-center'>

@@ -1,11 +1,12 @@
+import toast from 'react-hot-toast';
 import { Ed25519PublicKey } from '@mysten/sui.js/keypairs/ed25519';
-import { MouseEvent, useState } from 'react';
+import { MouseEvent, useEffect, useState } from 'react';
 import { MoveStructGame } from '../types/game-move';
-import { MoveStructMark } from '../types/mark-move';
 import { PACKAGE_ADDRESS, SUI_FULLNODE_URL } from '../config';
 import { SuiClient } from '@mysten/sui.js/client';
 import { TransactionBlock } from '@mysten/sui.js/transactions';
-import { fetchGame } from '../helpers/sui-fetch';
+import { errorWithToast } from '../helpers/error-with-toast';
+import { fetchGame, fetchMark } from '../helpers/sui-fetch';
 import { fromB64 } from '@mysten/bcs';
 import { multisigPubKey } from '../helpers/keys';
 import { sendMarkTxb } from '../helpers/txs';
@@ -30,32 +31,30 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
 
     async function handleClick(e: MouseEvent) {
         if (!isYourTurnFun(game!.cur_turn)) {
-            // TODO: Toaster instead
-            console.log("Not your turn yet");
+            toast("Not your turn yet");
             return;
         }
+        // REVIEW: These are not possible now correct?
         if (!gameId) {
-            console.log("No game ID");
+            toast.error("No game ID");
             return;
         }
         if (!oppoPubKey) {
-            console.log("No opponent public key");
+            toast.error("No opponent public key");
             return;
         }
         if (!currentAccount) {
-            console.log("No current account");
+            toast.error("No current account");
+            return;
+        }
+        const placement = parseInt((e.target as HTMLElement).id);
+        if (board[placement] !== 0) {
+            toast.error("Invalid placement, try again");
             return;
         }
 
-        const placement = parseInt((e.target as HTMLElement).id);
-        if (board[placement] !== 0) {
-            console.log("Invalid placement");
-            return;
-        }
-        const sendMarkResp = await sendMarkTxb(currentAccount.address, gameId, placement);
-        if (!sendMarkResp) {
-            console.log("No transaction block");
-        }
+        // REVIEW hardcoded: Find network from wallet
+        const suiClient = new SuiClient({ url: SUI_FULLNODE_URL });
 
         const opponentPubKeyArray = fromB64(oppoPubKey).slice(1);
         const opponentPubKey = new Ed25519PublicKey(opponentPubKeyArray);
@@ -67,88 +66,61 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
         }
         const multiSigAddr = multiSigPublicKey.toSuiAddress();
 
-        // REVIEW hardcoded: Find network from wallet
-        const suiClient = new SuiClient({ url: SUI_FULLNODE_URL });
+        let mark = await fetchMark(currentAccount.address, gameId);
+        if (mark) {
+            const sendTxb = sendMarkTxb({ mark, placement });
 
-        let mark;
-        if (sendMarkResp) {
-            const { txb: txb1, fetchedMark } = sendMarkResp;
-            mark = fetchedMark;
-            const resp1 = await signAndExecuteTransactionBlock({
-                transactionBlock: txb1,
+            const sendResp = await signAndExecuteTransactionBlock({
+                transactionBlock: sendTxb,
                 requestType: "WaitForLocalExecution",
                 options: {
                     showEffects: true
                 }
             }).catch((e) => {
-                console.log("Send mark txb call threw an error:");
-                console.log(e);
+                errorWithToast("Send mark txb call threw an error", e);
             });
 
-            if (resp1?.errors) {
-                console.log("Error executing transaction block");
-                console.log(resp1.errors);
-                return;
-            } else if (resp1?.effects?.status?.status !== 'success') {
-                console.log("Failure executing transaction block");
-                console.log(resp1?.effects?.status);
+            if (!sendResp) {
                 return;
             }
-        } else { // mark could be on the multisigAddr
-            const marksResp = await suiClient.getOwnedObjects({
-                owner: multiSigAddr,
-                filter: {
-                    StructType: `${PACKAGE_ADDRESS}::multisig_tic_tac_toe::Mark`
-                },
-                options: {
-                    showContent: true
-                }
-            });
-
-            const marks = marksResp.data.filter((markResp) => {
-                const suiParsedData = markResp.data?.content as {
-                    dataType: 'moveObject';
-                    fields: MoveStructMark;
-                    hasPublicTransfer: boolean;
-                    type: string;
-                };
-                return suiParsedData.fields.game_id === gameId;
-            });
-
-            mark = (marks[0].data!.content as {
-                dataType: 'moveObject';
-                fields: MoveStructMark;
-                hasPublicTransfer: boolean;
-                type: string;
-            }).fields;
+            if (sendResp.errors) {
+                errorWithToast("Error executing transaction block", sendResp.errors);
+                return;
+            } else if (sendResp.effects?.status?.status !== 'success') {
+                errorWithToast("Failure executing transaction block", sendResp?.effects);
+                return;
+            }
+        } else { // May be already sent
+            mark = await fetchMark(multiSigAddr, gameId);
         }
+
         if (!mark) {
-            console.log("Couldn't find mark");
+            toast.error("Something went wrong fetching the mark");
             return;
         }
 
-        const txb2 = new TransactionBlock();
+        const txbPlace = new TransactionBlock();
 
-        txb2.moveCall({
+        txbPlace.moveCall({
             target: `${PACKAGE_ADDRESS}::multisig_tic_tac_toe::place_mark`,
             arguments: [
-                txb2.object(gameId),
-                txb2.object(mark.id.id)
+                txbPlace.object(gameId),
+                txbPlace.object(mark.id.id)
             ]
         });
 
-        txb2.setSender(multiSigAddr);
-        txb2.setGasOwner(currentAccount!.address);
+        txbPlace.setSender(multiSigAddr);
+        txbPlace.setGasOwner(currentAccount!.address);
         const {
             signature: mySignature,
             transactionBlockBytes
         } = await signTransactionBlock({
-            transactionBlock: txb2,
+            transactionBlock: txbPlace,
         });
 
         const combinedSignature = multiSigPublicKey.combinePartialSignatures([mySignature]);
 
-        const resp2 = await suiClient.executeTransactionBlock({
+        const respPlace = await suiClient.executeTransactionBlock({
             transactionBlock: transactionBlockBytes,
             signature: [combinedSignature, mySignature],
             options: {
@@ -159,18 +131,17 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
                 showInput: true,
             }
         }).catch((e) => {
-            console.log("Place mark txb call threw an error:");
-            console.log(e);
+            errorWithToast("Place mark txb call threw an error", e);
         });
 
-
-        if (resp2?.errors) {
-            console.log("Error executing transaction block");
-            console.log(resp2.errors);
+        if (!respPlace) {
             return;
-        } else if (resp2?.effects?.status?.status !== 'success') {
-            console.log("Failure executing transaction block");
-            console.log(resp2?.effects?.status);
+        }
+        if (respPlace.errors) {
+            errorWithToast("Error executing transaction block", respPlace.errors);
+            return;
+        } else if (respPlace.effects?.status?.status !== 'success') {
+            errorWithToast("Failure executing transaction block", respPlace?.effects);
             return;
         }
 
@@ -183,13 +154,13 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
 
     async function updateGameState() {
         if (!gameId) {
-            console.log("No game ID");
+            toast.error("No game ID");
             return;
         }
 
         const gameObject = await fetchGame(gameId)
         if (!gameObject) {
-            console.log("No game object");
+            toast.error("No game object");
             return;
         }
         setGame(gameObject);
@@ -209,7 +180,13 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
                     options: {
                         showContent: true
                     }
+                }).catch((e) => {
+                    errorWithToast("Get trophies call threw an error", e);
                 });
+
+            if (!trophiesResp) {
+                return;
+            }
 
             const trophyResp = trophiesResp.data.filter((trophyResp) => {
                 const suiParsedData = trophyResp.data?.content as {
@@ -230,7 +207,7 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
             });
 
             if (!trophyResp.length) {
-                console.log('No trophies found');
+                toast.error('No trophies found');
                 return;
             }
 
@@ -259,22 +236,32 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
     }
 
     function getFinishedText() {
-        if (game?.finished === 0) {
+        if (!game || ! trophyId) {
+            return;
+        }
+        if (game.finished === 0) {
             return (<p>
                 Note: If new mark does not appear, try re - clicking on an empty cell
             </p>);
         }
-        if (game?.finished === 3) {
+        if (game.finished === 3) {
+            toast("It's a draw!");
             return (<p>It's a draw!</p>);
         }
 
         const href = `https://suiexplorer.com/object/${trophyId?.trophyId}`;
         if (trophyId?.won) {
+            // REVIEW: toast sometimes has a conflict like:
+            // Warning: Cannot update a component (`Ie`) while rendering a different component (`Game`). To locate the bad setState() call inside `Game`, follow the stack trace as described in
+            toast.success("You won!");
             return (<>
                 <p>You won! </p>
                 <a href={href} > Trophy </a>
             </>);
         } else if (!trophyId?.won) {
+            // REVIEW: toast sometimes has a conflict like:
+            // Warning: Cannot update a component (`Ie`) while rendering a different component (`Game`). To locate the bad setState() call inside `Game`, follow the stack trace as described in
+            toast("You lost...");
             return (<>
                 <p>You lost... </p>
                 <a href={href} > Trophy </a>
@@ -282,10 +269,28 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
         }
     }
 
+    // REVIEW: Leaving empty dependencies keeps game state as undefined.
+    // REVIEW: This seems a little illegal. I have an interval loop in my hooks
+    // Poll the blockchain every 1 sec
+    useEffect(() => {
+        // Create an interval that updates the state every 1 second
+        const intervalId = setInterval(() => {
+            console.log("update loop");
+            if (game && game.finished !== 0) {
+                clearInterval(intervalId);
+                return;
+            }
+            updateGameState();
+        }, 1000); // 1000 milliseconds = 1 second
+
+        // Clean up the interval when the component unmounts
+        return () => clearInterval(intervalId);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [game]); // ~~Only run once~~
+
     return {
         handleClick,
         renderSquare,
-        updateGameState,
         getCurrentTurnText,
         getFinishedText,
     };

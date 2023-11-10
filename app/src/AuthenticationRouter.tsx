@@ -8,14 +8,12 @@ export const AuthenticationRouter = () => {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    console.log(status);
     if (status === "CONNECTED" && currentAccount) {
       setConnected(true);
     }
     else {
       setConnected(false);
     }
-    console.log(currentAccount?.address);
   }, [status, currentAccount]);
 
   if (connected) {
