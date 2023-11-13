@@ -4,7 +4,6 @@ export default {
   theme: {
     extend: {},
   },
-  prefix: "tw-",
   corePlugins: {
       preflight: false
   },

@@ -24,26 +24,26 @@ function Game() {
     } = useGame({ oppoPubKey: oppoPubKeyAsStr, gameId: gameIdAsStr });
 
     return (
-        <div className='tw-text-center tw-flex tw-flex-col tw-w-full tw-items-center'>
+        <div className='text-center flex flex-col w-full items-center'>
             <h1>{getCurrentTurnText()}</h1>
-            <div className='tw-text-left'>
+            <div className='text-left'>
                 <p>
                     My Public Key: {currentAccount && ed25519PublicKeyB64(currentAccount.publicKey)}<br />
                     (Share it with opponent to join game)</p>
                 <p>Game ID: {gameId}</p>
             </div>
-            <table>
+            <table className="border-collapse">
                 <tbody>
                     {Array(3)
                         .fill(null)
                         .map((_, row) => (
-                            <tr key={row} className="board-row">
+                            <tr key={row} >
                                 {Array(3)
                                     .fill(null)
                                     .map((_, col) => {
                                         const index = row * 3 + col;
                                         return (<td
-                                            className='tw-border tw-w-20 tw-h-20 tw-text-6xl tw-text-center'
+                                            className="border-2 border-solid w-20 h-20 font-sans text-6xl"
                                             id={index.toString()}
                                             key={col}
                                             onClick={handleClick}>
@@ -54,7 +54,7 @@ function Game() {
                         ))}
                 </tbody>
             </table>
-            <div className='tw-text-center'>{getFinishedText()}</div>
+            <div className="text-center">{getFinishedText()}</div>
         </div>
     );
 }

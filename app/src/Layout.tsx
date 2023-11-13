@@ -4,9 +4,9 @@ import { Outlet } from "react-router-dom";
 export const Layout = () => {
   const { currentAccount } = useWalletKit();
   return (
-    <div className="tw-space-y-2">
-      <div className="tw-p-2 tw-bg-gray-100 tw-flex tw-flex-row tw-w-full tw-justify-between tw-items-center">
-        <div className="tw-text-xl">Multisig Tic Tac Toe</div>
+    <div className="space-y-2">
+      <div className="p-2 bg-gray-100 flex flex-row w-full justify-between items-center">
+        <div className="text-xl">Multisig Tic Tac Toe</div>
         {!!currentAccount?.address && <ConnectButton />}
       </div>
       <Outlet />
