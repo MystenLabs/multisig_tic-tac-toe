@@ -35,6 +35,7 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
             return;
         }
         // REVIEW: These are not possible now correct?
+        // Should I keep them?
         if (!gameId) {
             toast.error("No game ID");
             return;

@@ -8,7 +8,7 @@ function Game() {
     const { oppoPubKey, gameId } = useParams<{ oppoPubKey: string, gameId: string }>();
     const navigate = useNavigate();
 
-    // REVIEW is this correct?
+    // REVIEW is this good practice?
     // There shouldn't be the case that either oppoPubKey or gameId are empty now.
     if (!oppoPubKey || !gameId) {
         navigate('/');
