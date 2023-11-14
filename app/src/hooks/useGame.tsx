@@ -17,6 +17,8 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
     const [game, setGame] = useState<MoveStructGame | undefined>();
     const [board, setBoard] = useState<number[]>([]);
     const [trophyId, setTrophyId] = useState<{ won: boolean, trophyId: string } | undefined>();
+    const [isGameDeleted, setIsGameDeleted] = useState(false);
+    const [gameNotFound, setGameNotFound] = useState(false);
 
     function isYourTurnFun(curTurn: number) {
         if (!game || !currentAccount) {
@@ -161,10 +163,12 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
 
         const gameObject = await fetchGame(gameId)
         if (!gameObject) {
+            setGameNotFound(true);
             toast.error("No game object");
             return;
         }
         setGame(gameObject);
+        setGameNotFound(false);
         setBoard(gameObject.gameboard);
 
         if (gameObject?.finished === 1 || gameObject?.finished === 2) {
@@ -237,7 +241,7 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
     }
 
     function getFinishedText() {
-        if (!game || ! trophyId) {
+        if (!game || !trophyId) {
             return;
         }
         if (game.finished === 0) {
@@ -245,9 +249,25 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
                 Note: If new mark does not appear, try re - clicking on an empty cell
             </p>);
         }
+
+        let button = <></>
+        if (!isGameDeleted) {
+            button = <div className="pt-4">
+                <button
+                    type="button"
+                    className="focus:outline-none text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900"
+                    onClick={deleteGame}
+                >
+                    Delete Game Object
+                </button>
+            </div>
+        }
         if (game.finished === 3) {
             toast("It's a draw!");
-            return (<p>It's a draw!</p>);
+            return (<>
+                <p>It's a draw!</p>
+                {button}
+            </>);
         }
 
         const href = `https://suiexplorer.com/object/${trophyId?.trophyId}`;
@@ -258,6 +278,7 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
             return (<>
                 <p>You won! </p>
                 <a href={href} > Trophy </a>
+                {button}
             </>);
         } else if (!trophyId?.won) {
             // REVIEW: toast sometimes has a conflict like:
@@ -270,6 +291,78 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
         }
     }
 
+    async function deleteGame() {
+        if (!gameId) {
+            toast.error("No game ID");
+        }
+        if (!game) {
+            toast.error("No game object");
+        }
+        if (game?.finished === 0) {
+            toast.error("Game not finished yet");
+        }
+
+        const opponentPubKeyArray = fromB64(oppoPubKey).slice(1);
+        const opponentPubKey = new Ed25519PublicKey(opponentPubKeyArray);
+        let multiSigPublicKey;
+        if (game?.x_addr == currentAccount!.address) {
+            multiSigPublicKey = multisigPubKey(new Ed25519PublicKey(currentAccount!.publicKey), opponentPubKey);
+        } else {
+            multiSigPublicKey = multisigPubKey(opponentPubKey, new Ed25519PublicKey(currentAccount!.publicKey));
+        }
+        const multiSigAddr = multiSigPublicKey.toSuiAddress();
+
+        // REVIEW: Hardcoded
+        const suiClient = new SuiClient({ url: SUI_FULLNODE_URL });
+        const txbDelete = new TransactionBlock();
+
+        txbDelete.moveCall({
+            target: `${PACKAGE_ADDRESS}::multisig_tic_tac_toe::delete_game`,
+            arguments: [
+                txbDelete.object(gameId),
+            ]
+        });
+
+        txbDelete.setSender(multiSigAddr);
+        txbDelete.setGasOwner(currentAccount!.address);
+        const {
+            signature: mySignature,
+            transactionBlockBytes
+        } = await signTransactionBlock({
+            transactionBlock: txbDelete,
+        });
+
+        const combinedSignature = multiSigPublicKey.combinePartialSignatures([mySignature]);
+
+        const respDelete = await suiClient.executeTransactionBlock({
+            transactionBlock: transactionBlockBytes,
+            signature: [combinedSignature, mySignature],
+            options: {
+                showEvents: true,
+                showEffects: true,
+                showObjectChanges: true,
+                showBalanceChanges: true,
+                showInput: true,
+            }
+        }).catch((e) => {
+            errorWithToast("Delete game txb call threw an error", e);
+        });
+        if (!respDelete) {
+            return;
+        }
+
+        if (respDelete.errors) {
+            errorWithToast("Error executing transaction block", respDelete.errors);
+            return;
+        } else if (respDelete.effects?.status?.status !== 'success') {
+            errorWithToast("Failure executing transaction block", respDelete?.effects);
+            return;
+        }
+
+        toast.success("Game deleted");
+        setIsGameDeleted(true);
+    }
+
     // REVIEW: Leaving empty dependencies keeps game state as undefined.
     // REVIEW: This seems a little illegal. I have an interval loop in my hooks
     // Poll the blockchain every 1 sec
@@ -277,7 +370,7 @@ export function useGame({ oppoPubKey, gameId }: { oppoPubKey: string, gameId: st
         // Create an interval that updates the state every 1 second
         const intervalId = setInterval(() => {
             console.log("update loop");
-            if (game && game.finished !== 0) {
+            if (isGameDeleted || gameNotFound || (game && game.finished !== 0)) {
                 clearInterval(intervalId);
                 return;
             }

@@ -29,7 +29,8 @@ function Game() {
             <div className='text-left'>
                 <p>
                     My Public Key: {currentAccount && ed25519PublicKeyB64(currentAccount.publicKey)}<br />
-                    (Share it with opponent to join game)</p>
+                    (Share it with opponent to join game)
+                </p>
                 <p>Game ID: {gameId}</p>
             </div>
             <table className="border-collapse">
