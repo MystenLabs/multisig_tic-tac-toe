@@ -1,5 +1,5 @@
-import CreateOrJoinGame from "../components/CreateOrJoinGame";
-import Game from "../components/Game";
+import CreateOrJoinGame from "../pages/CreateOrJoinGame";
+import Game from "../pages/Game";
 import { AuthenticationRouter } from "../AuthenticationRouter";
 import { Layout } from "../Layout";
 import { NotFoundPage } from "../pages/NotFoundPage";

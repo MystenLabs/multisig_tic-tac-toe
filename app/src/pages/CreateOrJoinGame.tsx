@@ -25,7 +25,10 @@ function CreateOrJoinGame() {
           (Share it with opponent to join game)
         </p>
         <div className="w-1/2 ">
-          <label htmlFor="opponent" className="block text-gray-700 text-sm font-bold mb-2">
+          <label
+            htmlFor="opponent"
+            className="block text-gray-700 text-sm font-bold mb-2"
+          >
             Opponent Ed25519 Public Key
           </label>
           <input
@@ -44,7 +47,11 @@ function CreateOrJoinGame() {
               Create Game (as X)
             </button>
             <button
-              className="bg-transparent hover:bg-blue-700 text-blue-500 font-semibold hover:text-white py-2 px-4 border border-blue-500 hover:border-transparent rounded"
+              className={`${
+                opponentValid
+                  ? "bg-transparent hover:bg-blue-700 text-blue-500 hover:text-white border-blue-500 hover:border-transparent"
+                  : "bg-gray-300 text-gray-500 border-gray-300 cursor-not-allowed"
+              }   font-semibold py-2 px-4 border  rounded`}
               onClick={handleJoinGame}
               disabled={!opponentValid}
             >

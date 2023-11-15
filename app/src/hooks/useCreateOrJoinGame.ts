@@ -10,6 +10,8 @@ import { useNavigate } from "react-router-dom";
 import { useWalletKit } from "@mysten/wallet-kit";
 import { errorWithToast } from "../helpers/error-with-toast";
 
+// TODO: handle case of creating game with my own public key
+
 export const useCreateOrJoinGame = () => {
     const { currentAccount, signTransactionBlock } = useWalletKit();
 
@@ -54,7 +56,6 @@ export const useCreateOrJoinGame = () => {
             mySignature,
         ]);
 
-        // REVIEW hardcoded: Find network from wallet
         const suiClient = new SuiClient({ url: SUI_FULLNODE_URL });
         const resp = await suiClient.executeTransactionBlock({
             transactionBlock: transactionBlockBytes,
