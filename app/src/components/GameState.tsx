@@ -21,10 +21,6 @@ export default function GameState(args: { game: MoveStructGame, oppoPubKeyB64: s
         </>
     }
 
-    function onDeleteClicked() {
-        deleteGame!()
-    }
-
     return <>
         <div className="pt-4">{(game.finished === 1) === (playingAs === "X") ? "You won!" : "You lost..."}</div>
         {trophyId && <a href={`https://suiexplorer.com/object/${trophyId}?network=testnet`}>Trophy</a>}
@@ -34,7 +30,7 @@ export default function GameState(args: { game: MoveStructGame, oppoPubKeyB64: s
                 <button
                     type="button"
                     className="focus:outline-none text-white bg-red-700 hover:bg-red-800 focus:ring-4 focus:ring-red-300 font-medium rounded-lg text-sm px-5 py-2.5 me-2 mb-2 dark:bg-red-600 dark:hover:bg-red-700 dark:focus:ring-red-900"
-                    onClick={onDeleteClicked}
+                    onClick={deleteGame!}
                 >
                     Delete Game Object
                 </button>
