@@ -105,3 +105,54 @@ export async function fetchMark(owner: string, gameId: string) {
     };
     return content0.fields;
 }
+
+export async function fetchTrophy(game: MoveStructGame) {
+    const suiClient = new SuiClient({ url: SUI_FULLNODE_URL });
+
+    if (game.finished !== 1 && game.finished !== 2) {
+        return;
+    }
+    const owner = game.finished === 1 ? game.x_addr : game.o_addr;
+
+    // Pagination
+    let cursor = undefined;
+    while (true) {
+        console.log('pagination');
+        const { data, hasNextPage, nextCursor } = await suiClient
+            .getOwnedObjects({
+                owner,
+                filter: {
+                    StructType: `${PACKAGE_ADDRESS}::multisig_tic_tac_toe::TicTacToeTrophy`,
+                },
+                cursor,
+                options: {
+                    showContent: true,
+                },
+            });
+        cursor = nextCursor;
+
+        const trophyResp = data.find((trophyResp) => {
+            const suiParsedData = trophyResp.data?.content as {
+                dataType: "moveObject";
+                fields: {
+                    id: {
+                        id: string;
+                    };
+                    winner: string;
+                    loser: string;
+                    played_as: number;
+                    game_id: string;
+                };
+                hasPublicTransfer: boolean;
+                type: string;
+            };
+            return suiParsedData.fields.game_id === game.id.id;
+        });
+
+        if (!trophyResp && hasNextPage) {
+            continue;
+        }
+        return trophyResp?.data?.objectId
+    }
+}
+

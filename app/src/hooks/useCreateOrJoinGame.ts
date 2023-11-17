@@ -1,16 +1,15 @@
 import { ChangeEvent, useState } from "react";
-import { Ed25519PublicKey } from "@mysten/sui.js/keypairs/ed25519";
-import { PACKAGE_ADDRESS, SUI_FULLNODE_URL } from "../config";
-import { SuiClient, SuiObjectChangeCreated } from "@mysten/sui.js/client";
-import { createGameTxb } from "../helpers/txs";
-import { findGame } from "../helpers/sui-fetch";
-import { fromB64 } from "@mysten/bcs";
-import { multisigPubKey } from "../helpers/keys";
 import { useNavigate } from "react-router-dom";
 import { useWalletKit } from "@mysten/wallet-kit";
-import { errorWithToast } from "../helpers/error-with-toast";
+import { SuiClient, SuiObjectChangeCreated } from "@mysten/sui.js/client";
+import { Ed25519PublicKey } from "@mysten/sui.js/keypairs/ed25519";
+import { fromB64 } from "@mysten/bcs";
 
-// TODO: handle case of creating game with my own public key
+import { PACKAGE_ADDRESS, SUI_FULLNODE_URL } from "../config";
+import { createGameTxb } from "../helpers/txbs";
+import { findGame } from "../helpers/suiFetch";
+import { multisigPubKey } from "../helpers/keys";
+import { consoleAndToast } from "../helpers/consoleAndToast";
 
 export const useCreateOrJoinGame = () => {
     const { currentAccount, signTransactionBlock } = useWalletKit();
@@ -25,7 +24,10 @@ export const useCreateOrJoinGame = () => {
 
         setOpponentPubKey(newOpponent);
         try {
-            new Ed25519PublicKey(opponentPubKeyArray);
+            multisigPubKey(
+                new Ed25519PublicKey(opponentPubKeyArray),
+                new Ed25519PublicKey(currentAccount!.publicKey)
+            );
         } catch (e) {
             setOpponentValid(false);
             return;
@@ -68,17 +70,17 @@ export const useCreateOrJoinGame = () => {
                 showInput: true,
             },
         }).catch((e) => {
-            errorWithToast("Create game txb call threw error", e);
+            consoleAndToast(e, "Create game txb call threw error");
         });
         if (!resp) {
             return;
         }
 
         if (resp.errors) {
-            errorWithToast("Error during create game txb", resp.errors);
+            consoleAndToast(resp.errors, "Error during create game txb");
             return;
         } else if (resp.effects?.status.status !== "success") {
-            errorWithToast("Failure during create game txb", resp.effects);
+            consoleAndToast(resp.effects, "Failure during create game txb");
             return;
         }
 
@@ -90,7 +92,7 @@ export const useCreateOrJoinGame = () => {
             );
         }).at(0) as SuiObjectChangeCreated | undefined;
         if (!game) {
-            errorWithToast("No game found in object changes", resp.objectChanges);
+            consoleAndToast(resp.objectChanges, "No game found in object changes");
             return;
         }
 

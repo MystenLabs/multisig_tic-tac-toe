@@ -4,21 +4,15 @@ import { useEffect, useState } from "react";
 import { useWalletKit } from "@mysten/wallet-kit";
 
 export const AuthenticationRouter = () => {
-  const { status, currentAccount } = useWalletKit();
-  const [connected, setConnected] = useState(false);
+    const { status, currentAccount } = useWalletKit();
+    const [connected, setConnected] = useState(false);
 
-  useEffect(() => {
-    if (status === "CONNECTED" && currentAccount) {
-      setConnected(true);
-    }
-    else {
-      setConnected(false);
-    }
-  }, [status, currentAccount]);
+    useEffect(() => {
+        setConnected(status === "CONNECTED" && !!currentAccount);
+    }, [status, currentAccount]);
 
-  if (connected) {
+    if (!connected) {
+        return <UnAuthorizedPage />;
+    }
     return <Outlet />;
-  } else {
-    return <UnAuthorizedPage />;
-  }
 };
