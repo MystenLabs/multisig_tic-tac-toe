@@ -14,10 +14,10 @@
     "@mysten/sui.js": "^0.44.0",
     "@mysten/wallet-kit": "^0.8.0",
     "autoprefixer": "^10.4.16",
-    "bootstrap": "^5.3.2",
     "postcss": "^8.4.31",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-hot-toast": "^2.4.1",
     "react-router-dom": "^6.16.0",
     "sass": "^1.69.3",
     "tailwindcss": "^3.3.3"
