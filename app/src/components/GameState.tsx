@@ -1,7 +1,6 @@
 import { MoveStructGame } from "../types/game-move";
 import { useGameState } from "../hooks/useGameState";
 
-// REVIEW: only this now: deleteGame is also signalling if delete is available
 export default function GameState(args: { game: MoveStructGame, oppoPubKeyB64: string, deleteGame?: () => Promise<void> }) {
     const { game, deleteGame } = args;
     const {
