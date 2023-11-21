@@ -1,16 +1,16 @@
+/// Contract for playing Tic Tac Toe using the MultiSig 1-out-of-2 account as game admin.
 /// In this case, as the players are only 2, the design could be simpler by passing the TicTacToe
 /// object directly, instead of passing a Mark object.
 /// However this is an attempt to illustrate the possibility that (1 out of N) multisig addresses
 /// can be used as replacement of shared objects in some cases.
+/// One could also use:
+/// 1. Events for triggering client updates.
+/// 2. Clock for preventing player hanging the game.
 module multisig_tic_tac_toe::multisig_tic_tac_toe {
     use std::vector;
     use std::option::{Self, Option};
 
     use sui::object::{Self, UID, ID};
-    // TODO: events
-    // use sui::event;
-    // TODO: clock to check that a player is not hanging the game
-    // use sui::clock;
     use sui::transfer;
     use sui::tx_context::{Self, TxContext};
 
@@ -38,7 +38,8 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
         cur_turn: u8,
         x_addr: address,
         o_addr: address,
-        finished: u8 // 0 not finished, 1 X Winner, 2 O Winner, 3 Draw
+        /// 0 not finished, 1 X Winner, 2 O Winner, 3 Draw
+        finished: u8
     }
 
     struct Mark has key {
@@ -77,13 +78,12 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
             game_id
         };
 
-        // TODO?: event: game-created
-
         transfer::transfer(tic_tac_toe, tx_context::sender(ctx));
         transfer::transfer(mark, x_addr);
     }
 
-    /// This is called by the one of the two addresses participating in the multisig, but not from the multisig itself.
+    /// This is called by the one of the two addresses participating in the multisig, but not from
+    /// the multisig itself.
     /// row: [0 - 2], col: [0 - 2]
     public entry fun send_mark_to_game(mark: Mark, row: u8, col: u8) {
         // Mark.during_turn prevents multisig-acc from editing mark.placement after it has been sent to it.
@@ -93,24 +93,20 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
         mark.during_turn = false;
         let game_owners = mark.game_owners;
         transfer::transfer(mark, game_owners);
-
-        // TODO: event: mark-sent
     }
 
-    /// This is called by the multisig account to execute the last move by the player who used `send_mark_to_game`.
-    /// TODO: Maybe we can pass TicTacToe "by value" in order to be able to burn it directly on game-finished,
-    /// while returning it to the owner (multisig-acc) otherwise
+    /// This is called by the multisig account to execute the last move by the player who used
+    /// `send_mark_to_game`.
+    /// REVIEW Can this work? (transfer obj to sender): Maybe we can pass TicTacToe "by value" in
+    /// order to be able to burn it directly on game-finished, while returning it to the owner 
+    /// (multisig-acc) otherwise
     public entry fun place_mark(game: &mut TicTacToe, mark: Mark, ctx: &mut TxContext) {
-        // Wrong game-mark combination.
         assert!(mark.game_id == object::uid_to_inner(&game.id), EMarkIsFromDifferentGame);
 
         let addr = get_cur_turn_address(game);
         // Note here we empty the option
         let placement: u8 = option::extract(&mut mark.placement);
         if (get_cell_by_index(&game.gameboard, placement) != MARK_EMPTY) {
-
-            // TODO: event: invalid turn
-
             mark.during_turn = true;
             transfer::transfer(mark, addr);
             return
@@ -147,17 +143,12 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
                 winner
             );
 
-            // object deletions
             delete_mark(mark);
             * &mut game.finished = finished;
-
-            // TODO: event: game-finished
             return
         } else if (game.cur_turn >= 8) {    // Draw
             delete_mark(mark);
             * &mut game.finished = 3;
-
-            // TODO: event: game-finished!
             return
         };
 
@@ -166,9 +157,9 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
         addr = get_cur_turn_address(game);
         mark.during_turn = true;
         transfer::transfer(mark, addr);
-        //TODO: event: mark-placed
     }
 
+    /// Deletes TicTacToe. Game should be finished first.
     public entry fun delete_game(game: TicTacToe) {
         let TicTacToe {
             id,
@@ -264,7 +255,6 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
         };
         option::none()
     }
-
 
     /// Gets column major cell from 3x3 matrix
     fun get_cell(mat33: &vector<u8>, row: u8, col: u8): u8 {
