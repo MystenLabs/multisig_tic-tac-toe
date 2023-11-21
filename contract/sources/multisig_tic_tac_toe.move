@@ -102,9 +102,6 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
 
     /// This is called by the multisig account to execute the last move by the player who used
     /// `send_mark_to_game`.
-    /// REVIEW Can this work? (transfer obj to sender): Maybe we can pass TicTacToe "by value" in
-    /// order to be able to burn it directly on game-finished, while returning it to the owner 
-    /// (multisig-acc) otherwise
     public entry fun place_mark(game: &mut TicTacToe, mark: Mark, ctx: &mut TxContext) {
         assert!(mark.game_id == object::uid_to_inner(&game.id), EMarkIsFromDifferentGame);
 
