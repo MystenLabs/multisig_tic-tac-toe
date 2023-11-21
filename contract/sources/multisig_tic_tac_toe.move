@@ -22,14 +22,18 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
     const ETriedToCheat: u64 = 1;
     const EMarkIsFromDifferentGame: u64 = 2;
 
+    /// Passed to the winner of the TicTacToe game.
     struct TicTacToeTrophy has key {
         id: UID,
         winner: address,
         loser: address,
+        /// 1: X, 2: O
         played_as: u8,
         game_id: ID
     }
 
+    /// TicTacToe struct should be owned by the game-admin.
+    /// This should be the multisig 1-out-of-2 account for both players to make moves.
     struct TicTacToe has key {
         id: UID,
         /// Column major 3x3 game board
@@ -42,6 +46,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
         finished: u8
     }
 
+    /// Mark is passed between game-admin (Multisig 1-out-of-2), x-player and o-player.
     struct Mark has key {
         id: UID,
         /// Column major 3x3 placement
