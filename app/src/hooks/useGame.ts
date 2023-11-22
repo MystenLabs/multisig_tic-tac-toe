@@ -224,7 +224,7 @@ export function useGame({
             return;
         }
         const gameObject = await fetchGame(gameId);
-        if (!gameObject) {
+        if (!gameObject && !gameDeleted) {
             toast.error("No game object");
             setGameDeleted(true);
             return;

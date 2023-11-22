@@ -1,8 +1,11 @@
 import { MoveStructGame } from "../types/game-move";
 import { useGameState } from "../hooks/useGameState";
+import { useState } from "react";
+import toast from "react-hot-toast";
 
 export default function GameState(args: { game: MoveStructGame, oppoPubKeyB64: string, deleteGame?: () => Promise<void> }) {
     const { game, deleteGame } = args;
+    const [shownToast, setShownToast] = useState(false);
     const {
         trophyId,
         playingAs,
@@ -18,6 +21,17 @@ export default function GameState(args: { game: MoveStructGame, oppoPubKeyB64: s
             <div>Current turn: {isXTurn ? "X" : "O"}</div>
             <div>{isMyTurn ? "Make your move" : "Waiting for opponent's move"}</div>
         </>
+    }
+
+    if (!shownToast) {
+        setShownToast(true);
+        if ((game.finished === 1) === (playingAs === "X")) {
+            toast.success("You won!");
+        } else if (game.finished === 3) {
+            toast("It's a draw");
+        } else {
+            toast("You lost...");
+        }
     }
 
     return <>
