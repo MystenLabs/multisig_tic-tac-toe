@@ -292,4 +292,15 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
             game_id
         }
     }
+
+    #[test_only]
+    public fun create_legit_mark(placement: u8, game_owners: address, game: &TicTacToe): Mark {
+        Mark {
+            id: object::new(&mut tx_context::dummy()),
+            placement: option::some(placement),
+            during_turn: false,
+            game_owners,
+            game_id: object::uid_to_inner(&game.id)
+        }
+    }
 }
