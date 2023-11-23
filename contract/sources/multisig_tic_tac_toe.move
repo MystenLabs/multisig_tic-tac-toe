@@ -276,4 +276,31 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
         assert!(row < 3 && col < 3, EInvalidSize);
         col*3 + row
     }
+
+    // ============================ TEST ONLY ============================
+
+    #[test_only]
+    public fun create_fake_mark(placement: Option<u8>, game_owners: address): Mark {
+        let id = object::new(&mut tx_context::dummy());
+        let game_id = object::uid_to_inner(&id);
+        let during_turn = option::is_none(&placement);
+        Mark {
+            id,
+            placement,
+            during_turn,
+            game_owners,
+            game_id
+        }
+    }
+
+    #[test_only]
+    public fun create_legit_mark(placement: u8, game_owners: address, game: &TicTacToe): Mark {
+        Mark {
+            id: object::new(&mut tx_context::dummy()),
+            placement: option::some(placement),
+            during_turn: false,
+            game_owners,
+            game_id: object::uid_to_inner(&game.id)
+        }
+    }
 }
