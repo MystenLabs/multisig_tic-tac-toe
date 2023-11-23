@@ -61,7 +61,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
 
     /// This should be called by a multisig (1 out of 2) address.
     /// x_addr and o_addr should be the two addresses part-taking in the multisig.
-    public entry fun create_game(x_addr: address, o_addr: address, ctx: &mut TxContext) {
+    public fun create_game(x_addr: address, o_addr: address, ctx: &mut TxContext) {
         let id = object::new(ctx);
         let game_id = object::uid_to_inner(&id);
 
@@ -90,7 +90,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
     /// This is called by the one of the two addresses participating in the multisig, but not from
     /// the multisig itself.
     /// row: [0 - 2], col: [0 - 2]
-    public entry fun send_mark_to_game(mark: Mark, row: u8, col: u8) {
+    public fun send_mark_to_game(mark: Mark, row: u8, col: u8) {
         // Mark.during_turn prevents multisig-acc from editing mark.placement after it has been sent to it.
         assert!(mark.during_turn, ETriedToCheat);
 
@@ -102,7 +102,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
 
     /// This is called by the multisig account to execute the last move by the player who used
     /// `send_mark_to_game`.
-    public entry fun place_mark(game: &mut TicTacToe, mark: Mark, ctx: &mut TxContext) {
+    public fun place_mark(game: &mut TicTacToe, mark: Mark, ctx: &mut TxContext) {
         assert!(mark.game_id == object::uid_to_inner(&game.id), EMarkIsFromDifferentGame);
 
         let addr = get_cur_turn_address(game);
@@ -162,7 +162,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
     }
 
     /// Deletes TicTacToe. Game should be finished first.
-    public entry fun delete_game(game: TicTacToe) {
+    public fun delete_game(game: TicTacToe) {
         let TicTacToe {
             id,
             gameboard: _,
@@ -172,6 +172,18 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
             finished
         } = game;
         assert!(finished != 0, ETriedToCheat);
+        object::delete(id);
+    }
+
+    /// Deletes TicTacToeTrophy
+    public fun delete_trophy(trophy: TicTacToeTrophy) {
+        let TicTacToeTrophy {
+            id,
+            winner: _,
+            loser: _,
+            played_as: _,
+            game_id: _
+        } = trophy;
         object::delete(id);
     }
 
