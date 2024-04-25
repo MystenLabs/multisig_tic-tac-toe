@@ -7,12 +7,6 @@
 /// 1. Events for triggering client updates.
 /// 2. Clock for preventing player hanging the game.
 module multisig_tic_tac_toe::multisig_tic_tac_toe {
-    use std::vector;
-    use std::option::{Self, Option};
-
-    use sui::object::{Self, UID, ID};
-    use sui::transfer;
-    use sui::tx_context::{Self, TxContext};
 
     const MARK_EMPTY: u8 = 0;
     const MARK_X: u8 = 1;
@@ -23,7 +17,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
     const EMarkIsFromDifferentGame: u64 = 2;
 
     /// Passed to the winner of the TicTacToe game.
-    struct TicTacToeTrophy has key {
+    public struct TicTacToeTrophy has key {
         id: UID,
         winner: address,
         loser: address,
@@ -34,7 +28,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
 
     /// TicTacToe struct should be owned by the game-admin.
     /// This should be the multisig 1-out-of-2 account for both players to make moves.
-    struct TicTacToe has key {
+    public struct TicTacToe has key {
         id: UID,
         /// Column major 3x3 game board
         gameboard: vector<u8>,
@@ -47,7 +41,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
     }
 
     /// Mark is passed between game-admin (Multisig 1-out-of-2), x-player and o-player.
-    struct Mark has key {
+    public struct Mark has key {
         id: UID,
         /// Column major 3x3 placement
         placement: Option<u8>,
@@ -79,22 +73,22 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
             id: object::new(ctx),
             placement: option::none(),
             during_turn: true, // Mark is passed to x_addr
-            game_owners: tx_context::sender(ctx),
+            game_owners: ctx.sender(),
             game_id
         };
 
-        transfer::transfer(tic_tac_toe, tx_context::sender(ctx));
+        transfer::transfer(tic_tac_toe, ctx.sender());
         transfer::transfer(mark, x_addr);
     }
 
     /// This is called by the one of the two addresses participating in the multisig, but not from
     /// the multisig itself.
     /// row: [0 - 2], col: [0 - 2]
-    public fun send_mark_to_game(mark: Mark, row: u8, col: u8) {
+    public fun send_mark_to_game(mut mark: Mark, row: u8, col: u8) {
         // Mark.during_turn prevents multisig-acc from editing mark.placement after it has been sent to it.
         assert!(mark.during_turn, ETriedToCheat);
 
-        option::fill(&mut mark.placement, get_index(row, col));
+        mark.placement.fill(get_index(row, col));
         mark.during_turn = false;
         let game_owners = mark.game_owners;
         transfer::transfer(mark, game_owners);
@@ -102,12 +96,12 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
 
     /// This is called by the multisig account to execute the last move by the player who used
     /// `send_mark_to_game`.
-    public fun place_mark(game: &mut TicTacToe, mark: Mark, ctx: &mut TxContext) {
+    public fun place_mark(game: &mut TicTacToe, mut mark: Mark, ctx: &mut TxContext) {
         assert!(mark.game_id == object::uid_to_inner(&game.id), EMarkIsFromDifferentGame);
 
-        let addr = get_cur_turn_address(game);
+        let mut addr = game.get_cur_turn_address();
         // Note here we empty the option
-        let placement: u8 = option::extract(&mut mark.placement);
+        let placement: u8 = mark.placement.extract();
         if (get_cell_by_index(&game.gameboard, placement) != MARK_EMPTY) {
             mark.during_turn = true;
             transfer::transfer(mark, addr);
@@ -120,14 +114,14 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
         } else {
             MARK_O
         };
-        *vector::borrow_mut(&mut game.gameboard, (placement as u64)) = mark_symbol;
+        * &mut game.gameboard[placement as u64] = mark_symbol;
 
         // Check for winner
-        let winner = get_winner(game);
+        let mut winner = game.get_winner();
 
         // Game ended!
-        if (option::is_some(&winner)) {
-            let played_as = option::extract(&mut winner);
+        if (winner.is_some()) {
+            let played_as = winner.extract();
             let (winner, loser, finished) = if (played_as == MARK_X) {
                 (game.x_addr, game.o_addr, 1)
             } else {
@@ -145,18 +139,18 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
                 winner
             );
 
-            delete_mark(mark);
+            mark.delete();
             * &mut game.finished = finished;
             return
         } else if (game.cur_turn >= 8) {    // Draw
-            delete_mark(mark);
+            mark.delete();
             * &mut game.finished = 3;
             return
         };
 
         // Next turn
         * &mut game.cur_turn = game.cur_turn + 1;
-        addr = get_cur_turn_address(game);
+        addr = game.get_cur_turn_address();
         mark.during_turn = true;
         transfer::transfer(mark, addr);
     }
@@ -186,6 +180,8 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
         } = trophy;
         object::delete(id);
     }
+
+    use fun delete_mark as Mark.delete;
 
     /// Internal: Only called when the game is finished
     fun delete_mark(mark: Mark) {
@@ -223,40 +219,40 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
         let p22 = get_cell(&game.gameboard, 2, 2);
 
         // Check all rows
-        let win_mark = check_for_winner(p00, p01, p02);
-        if (option::is_some(&win_mark)) {
+        let mut win_mark = check_for_winner(p00, p01, p02);
+        if (win_mark.is_some()) {
             return win_mark
         };
         win_mark = check_for_winner(p10, p11, p12);
-        if (option::is_some(&win_mark)) {
+        if (win_mark.is_some()) {
             return win_mark
         };
         win_mark = check_for_winner(p20, p21, p22);
-        if (option::is_some(&win_mark)) {
+        if (win_mark.is_some()) {
             return win_mark
         };
 
         // Check all columns
         win_mark = check_for_winner(p00, p10, p20);
-        if (option::is_some(&win_mark)) {
+        if (win_mark.is_some()) {
             return win_mark
         };
         win_mark = check_for_winner(p01, p11, p21);
-        if (option::is_some(&win_mark)) {
+        if (win_mark.is_some()) {
             return win_mark
         };
         win_mark = check_for_winner(p02, p12, p22);
-        if (option::is_some(&win_mark)) {
+        if (win_mark.is_some()) {
             return win_mark
         };
 
         // Check diagonals
         win_mark = check_for_winner(p00, p11, p22);
-        if (option::is_some(&win_mark)) {
+        if (win_mark.is_some()) {
             return win_mark
         };
         win_mark = check_for_winner(p02, p11, p20);
-        if (option::is_some(&win_mark)) {
+        if (win_mark.is_some()) {
             return win_mark
         };
         option::none()
@@ -272,15 +268,15 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
 
     /// Gets column major cell from 3x3 matrix
     fun get_cell(mat33: &vector<u8>, row: u8, col: u8): u8 {
-        assert!(vector::length(mat33) == 9, EInvalidSize);
+        assert!(mat33.length() == 9, EInvalidSize);
         let index = get_index(row, col);
 
-        *vector::borrow(mat33, (index as u64))
+        mat33[index as u64]
     }
 
     fun get_cell_by_index(mat33: &vector<u8>, index: u8): u8 {
         assert!(index < 9, EInvalidSize);
-        *vector::borrow(mat33, (index as u64))
+        mat33[index as u64]
     }
 
     /// Gets column major index from 3x3 matrix
@@ -295,7 +291,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
     public fun create_fake_mark(placement: Option<u8>, game_owners: address): Mark {
         let id = object::new(&mut tx_context::dummy());
         let game_id = object::uid_to_inner(&id);
-        let during_turn = option::is_none(&placement);
+        let during_turn = placement.is_none();
         Mark {
             id,
             placement,
