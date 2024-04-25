@@ -57,7 +57,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
     /// x_addr and o_addr should be the two addresses part-taking in the multisig.
     public fun create_game(x_addr: address, o_addr: address, ctx: &mut TxContext) {
         let id = object::new(ctx);
-        let game_id = object::uid_to_inner(&id);
+        let game_id = id.to_inner();
 
         let tic_tac_toe = TicTacToe {
             id,
@@ -97,7 +97,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
     /// This is called by the multisig account to execute the last move by the player who used
     /// `send_mark_to_game`.
     public fun place_mark(game: &mut TicTacToe, mut mark: Mark, ctx: &mut TxContext) {
-        assert!(mark.game_id == object::uid_to_inner(&game.id), EMarkIsFromDifferentGame);
+        assert!(mark.game_id == game.id.to_inner(), EMarkIsFromDifferentGame);
 
         let mut addr = game.get_cur_turn_address();
         // Note here we empty the option
@@ -134,7 +134,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
                     winner,
                     loser,
                     played_as,
-                    game_id: object::uid_to_inner(&game.id)
+                    game_id: game.id.to_inner()
                 },
                 winner
             );
@@ -290,7 +290,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
     #[test_only]
     public fun create_fake_mark(placement: Option<u8>, game_owners: address): Mark {
         let id = object::new(&mut tx_context::dummy());
-        let game_id = object::uid_to_inner(&id);
+        let game_id = id.to_inner();
         let during_turn = placement.is_none();
         Mark {
             id,
@@ -308,7 +308,7 @@ module multisig_tic_tac_toe::multisig_tic_tac_toe {
             placement: option::some(placement),
             during_turn: false,
             game_owners,
-            game_id: object::uid_to_inner(&game.id)
+            game_id: game.id.to_inner()
         }
     }
 }
