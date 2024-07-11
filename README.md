@@ -1,7 +1,7 @@
 # Multisig Tic Tac Toe
 
-See also https://github.com/MystenLabs/sui/blob/main/crates/sui-sdk/examples/tic_tac_toe.rs and
-https://github.com/MystenLabs/sui/blob/main/sui_programmability/examples/games/sources/shared_tic_tac_toe.move
+>[!IMPORTANT]
+> This example has moved! **Find the latest version in the Sui repo's [examples/tic-tac-toe](https://github.com/MystenLabs/sui/tree/main/examples/tic-tac-toe) directory**, next to a variant that uses consensus and shared objects.
 
 Instead of sharing the game-board, it belongs to the multi-sig account of the two players
 
